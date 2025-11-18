@@ -2,11 +2,13 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
-# Copy package files
+# Copy package files from backend folder
 COPY backend/package*.json ./
-RUN npm ci --only=production
 
-# Copy source code
+# Install dependencies
+RUN npm install
+
+# Copy backend source code
 COPY backend/ ./
 
 # Create non-root user
