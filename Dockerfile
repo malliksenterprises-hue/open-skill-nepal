@@ -5,8 +5,8 @@ WORKDIR /usr/src/app
 # Copy package files from backend folder
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies (use install instead of ci)
+RUN npm install --production
 
 # Copy backend source code
 COPY backend/ ./
