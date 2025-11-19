@@ -57,6 +57,27 @@ mongoose.connection.on('connected', () => {
   console.log('✅ MongoDB connected event fired');
 });
 
+// Auto-create sample users if they don't exist (for development)
+mongoose.connection.once('open', async () => {
+  console.log('✅ MongoDB connected successfully');
+  
+  try {
+    const User = require('./models/User');
+    const initData = require('./scripts/initData');
+    
+    // Check if any users exist
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      console.log('📝 No users found, initializing sample data...');
+      await initData();
+    } else {
+      console.log(`👥 Found ${userCount} existing users`);
+    }
+  } catch (error) {
+    console.log('ℹ️ Sample data already exists or initialization skipped');
+  }
+});
+
 // Global error handlers
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
