@@ -4,13 +4,16 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-app.use(cors({
-‎  origin: ['https://your-frontend-url.vercel.app', 'http://localhost:3000'],
-‎  credentials: true
-‎}));
 
-// Middleware
-app.use(cors());
+// Middleware - FIXED CORS
+app.use(cors({
+  origin: [
+    'https://open-skill-nepal-4zc9-git-main-dinesh-mc.vercel.app', // Your actual Vercel URL
+    'https://open-skill-nepal-4zc9-aej0wknbi-dinesh-1.vercel.app', // Your other Vercel URL
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Database connection
@@ -39,7 +42,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📚 Open Skill Nepal Backend Ready!`);
 });
