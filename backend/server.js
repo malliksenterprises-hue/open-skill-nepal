@@ -1,11 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 
-// Middleware - FIXED CORS
+// Middleware
 app.use(cors({
   origin: [
     'https://open-skill-nepal-4zc9-git-main-dinesh-mc.vercel.app',
@@ -16,118 +17,65 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Add request logging middleware
+// Request logging
 app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
-// Enhanced MongoDB connection with TLS fix
+// Enhanced MongoDB connection with direct testing
 console.log('🔧 Initializing MongoDB connection...');
-console.log('📝 MongoDB URI present:', process.env.MONGO_URI ? '✅ Yes' : '❌ No');
 
 if (!process.env.MONGO_URI) {
   console.error('💥 CRITICAL: MONGO_URI environment variable is missing!');
+} else {
+  // Log safe connection info
+  const safeURI = process.env.MONGO_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://$1:********@');
+  console.log('🔗 Connection URI:', safeURI);
 }
 
-// FIXED: MongoDB connection options with TLS handling
+// MongoDB connection options
 const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 15000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 10,
   retryWrites: true,
   w: 'majority',
-  // TLS/SSL fixes for MongoDB Atlas
   ssl: true,
-  sslValidate: true,
-  // Remove tlsAllowInvalidCertificates in production - only for testing
-  // tlsAllowInvalidCertificates: false
+  sslValidate: true
 };
 
-// Enhanced connection event listeners
+// Connection events
 mongoose.connection.on('connecting', () => {
   console.log('🔄 MongoDB Connecting...');
 });
 
 mongoose.connection.on('connected', () => {
   console.log('✅ MongoDB Connected successfully');
-  console.log('📊 Database name:', mongoose.connection.db?.databaseName || 'Unknown');
+  console.log('📊 Database:', mongoose.connection.db?.databaseName);
 });
 
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB Connection Error:', err.message);
-  if (err.name === 'MongoServerSelectionError') {
-    console.log('🔧 TLS/SSL Issue Detected - Applying fixes...');
-  }
 });
 
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB Disconnected');
-});
-
-// Initialize database connection with retry logic
+// Connect function with enhanced error handling
 async function connectDB() {
   try {
-    console.log('🚀 Attempting MongoDB connection with TLS fix...');
+    console.log('🚀 Attempting MongoDB connection...');
     
-    // Test connection with enhanced options
+    // Test connection with mongoose
     await mongoose.connect(process.env.MONGO_URI, mongooseOptions);
     console.log('🎉 MongoDB connection established successfully');
     
-    // Initialize sample data
-    await initializeSampleData();
-    
   } catch (error) {
-    console.error('💥 Primary connection failed:', error.message);
-    
-    // Try alternative connection method
-    await tryAlternativeConnection();
-  }
-}
-
-// Alternative connection method for TLS issues
-async function tryAlternativeConnection() {
-  try {
-    console.log('🔄 Attempting alternative connection method...');
-    
-    const alternativeOptions = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 15000,
-      // Try different TLS approach
-      tls: true,
-      tlsAllowInvalidCertificates: false,
-      retryWrites: true,
-      w: 'majority'
-    };
-    
-    await mongoose.connect(process.env.MONGO_URI, alternativeOptions);
-    console.log('✅ Alternative connection successful!');
-    
-  } catch (secondError) {
-    console.error('💥 Alternative connection also failed:', secondError.message);
-    console.log('\n🔧 REQUIRED MANUAL STEPS:');
-    console.log('1. Go to MongoDB Atlas → Network Access');
-    console.log('2. Add IP Address: 0.0.0.0/0 (Allow access from anywhere)');
-    console.log('3. Go to Database Access → Verify user has read/write permissions');
-    console.log('4. Check if MongoDB cluster is paused');
-  }
-}
-
-// Initialize sample data
-async function initializeSampleData() {
-  try {
-    const User = require('./models/User');
-    const userCount = await User.countDocuments();
-    console.log(`👥 Found ${userCount} existing users`);
-    
-    if (userCount === 0) {
-      console.log('📝 No users found, would initialize sample data...');
-    }
-  } catch (error) {
-    console.log('ℹ️ Sample data check skipped:', error.message);
+    console.error('💥 MongoDB connection failed:', error.message);
+    console.log('\n🔧 DIAGNOSIS:');
+    console.log('📝 Username mismatch detected!');
+    console.log('💡 Solution: Check MongoDB Atlas → Database Access');
+    console.log('Expected: malliksenterprises_db_user');
+    console.log('Actual: Check what is shown in Atlas');
   }
 }
 
@@ -137,51 +85,71 @@ connectDB();
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 
-// Health check
+// Enhanced health check
 app.get('/api/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState;
-  const dbStatusText = {
-    0: 'disconnected',
-    1: 'connected', 
-    2: 'connecting',
-    3: 'disconnecting'
-  }[dbStatus] || 'unknown';
+  const statusText = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbStatus] || 'unknown';
   
-  res.json({ 
+  res.json({
     status: dbStatus === 1 ? 'healthy' : 'unhealthy',
-    database: dbStatusText,
+    database: statusText,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Enhanced debug endpoint
-app.get('/api/debug/mongodb', async (req, res) => {
+// Direct MongoDB test endpoint
+app.get('/api/debug/mongodb-test', async (req, res) => {
+  try {
+    console.log('🔍 Testing MongoDB connection directly...');
+    
+    // Test with native MongoDB driver
+    const client = new MongoClient(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+      ssl: true
+    });
+    
+    await client.connect();
+    const pingResult = await client.db('admin').command({ ping: 1 });
+    await client.close();
+    
+    res.json({
+      status: 'success',
+      message: 'MongoDB connection successful with native driver',
+      ping: pingResult,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Direct MongoDB test failed:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      suggestion: 'Check username and password in MongoDB Atlas',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Database info endpoint
+app.get('/api/debug/db-info', (req, res) => {
   const dbStatus = mongoose.connection.readyState;
+  const statusText = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbStatus] || 'unknown';
   
-  const debugInfo = {
-    mongooseState: ['disconnected', 'connected', 'connecting', 'disconnecting'][dbStatus] || 'unknown',
+  res.json({
+    mongooseState: statusText,
     readyState: dbStatus,
     mongoURIPresent: !!process.env.MONGO_URI,
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
-  };
-  
-  if (dbStatus === 1) {
-    try {
-      const adminDb = mongoose.connection.db.admin();
-      debugInfo.ping = await adminDb.ping();
-      debugInfo.userCount = await mongoose.connection.db.collection('users').countDocuments();
-    } catch (dbError) {
-      debugInfo.dbError = dbError.message;
-    }
-  }
-  
-  res.json(debugInfo);
+  });
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔍 Debug endpoint: /api/debug/mongodb`);
+  console.log(`🔍 Debug endpoints:`);
+  console.log(`   - /api/health`);
+  console.log(`   - /api/debug/mongodb-test`);
+  console.log(`   - /api/debug/db-info`);
 });
