@@ -14,7 +14,7 @@ async function apiRequest(endpoint, options = {}) {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    credentials: 'same-origin', // Add this for CORS with credentials
+    // REMOVED credentials line to fix CORS issues
     ...options,
   }
 
