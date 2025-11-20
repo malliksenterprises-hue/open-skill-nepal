@@ -14,7 +14,7 @@ async function apiRequest(endpoint, options = {}) {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    credentials: 'include', // Add this for CORS with credentials
+    credentials: 'same-origin', // Add this for CORS with credentials
     ...options,
   }
 
