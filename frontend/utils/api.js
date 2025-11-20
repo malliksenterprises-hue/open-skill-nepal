@@ -1,5 +1,5 @@
-// Base API URL - adjust based on environment
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000/api'
+// Base API URL - FIXED: Use your Cloud Run backend
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://open-skill-nepal-669869115660.asia-south1.run.app/api'
 
 /**
  * Generic API request function
@@ -7,11 +7,14 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000/api'
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`
   
+  console.log('🔗 API Request:', url) // Add logging
+  
   const config = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    credentials: 'include', // Add this for CORS with credentials
     ...options,
   }
 
@@ -27,13 +30,14 @@ async function apiRequest(endpoint, options = {}) {
     if (!response.ok) {
       throw {
         message: data.message || 'API request failed',
-        response: { data }
+        status: response.status,
+        data: data
       }
     }
 
     return data
   } catch (error) {
-    console.error('API request error:', error)
+    console.error('❌ API request error:', error)
     throw error
   }
 }
