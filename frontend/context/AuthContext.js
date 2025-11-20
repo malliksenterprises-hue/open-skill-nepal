@@ -45,7 +45,10 @@ export function AuthProvider({ children }) {
    */
   const login = async (email, password) => {
     try {
+      console.log('🔄 AuthContext: Attempting login...') // Add logging
       const response = await authAPI.login(email, password)
+      console.log('✅ AuthContext: Login response:', response) // Add logging
+      
       const { token: newToken, user: userData } = response
       
       localStorage.setItem('openSkillToken', newToken)
@@ -54,9 +57,12 @@ export function AuthProvider({ children }) {
       
       return { success: true, user: userData }
     } catch (error) {
+      console.error('❌ AuthContext: Login error:', error) // Add logging
+      
+      // FIXED: Correct error property access
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Login failed' 
+        message: error.message || error.data?.message || 'Login failed' 
       }
     }
   }
@@ -66,7 +72,10 @@ export function AuthProvider({ children }) {
    */
   const googleLogin = async (googleData) => {
     try {
+      console.log('🔄 AuthContext: Attempting Google login...')
       const response = await authAPI.googleLogin(googleData)
+      console.log('✅ AuthContext: Google login response:', response)
+      
       const { token: newToken, user: userData } = response
       
       localStorage.setItem('openSkillToken', newToken)
@@ -75,9 +84,12 @@ export function AuthProvider({ children }) {
       
       return { success: true, user: userData }
     } catch (error) {
+      console.error('❌ AuthContext: Google login error:', error)
+      
+      // FIXED: Correct error property access
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Google login failed' 
+        message: error.message || error.data?.message || 'Google login failed' 
       }
     }
   }
