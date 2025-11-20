@@ -5,14 +5,18 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware - FIXED CORS
+// Middleware - FIXED CORS - UPDATED DOMAINS
 app.use(cors({
   origin: [
+    'https://open-skill-nepal.vercel.app', // ← ADDED - your current domain
+    'https://open-skill-nepal-qsq3idytx-dinesh-malliks-projects.vercel.app', // ← ADDED
     'https://open-skill-nepal-4zc9-git-main-dinesh-mc.vercel.app',
     'https://open-skill-nepal-4zc9-aej0wknbi-dinesh-1.vercel.app',
     'http://localhost:3000'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 app.use(express.json());
 
