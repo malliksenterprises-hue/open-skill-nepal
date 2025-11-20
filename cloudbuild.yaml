@@ -1,4 +1,3 @@
-# cloudbuild.yaml
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
@@ -21,12 +20,9 @@ steps:
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
-    - '--set-env-vars'
-    - 'MONGO_URI=mongodb+srv://malliksenterprises_db_user:pPrWR77lmSbPLOwV@openskillnepal-cluster.p478dl8.mongodb.net/openskillnepal?retryWrites=true&w=majority&appName=openskillnepal-cluster'
-    - '--set-env-vars'
-    - 'JWT_SECRET=openskillnepal-jwt-secret-2024-1734557890-aB3$fG7*hJ2'
-    - '--set-env-vars'
-    - 'NODE_ENV=production'
+    - '--set-env-vars=MONGO_URI=mongodb+srv://malliksenterprises_db_user:pPrWR77lmSbPLOwV@openskillnepal-cluster.p478dl8.mongodb.net/openskillnepal?retryWrites=true&w=majority&appName=openskillnepal-cluster'
+    - '--set-env-vars=JWT_SECRET=openskillnepal-jwt-secret-2024-1734557890-aB3$fG7*hJ2'
+    - '--set-env-vars=NODE_ENV=production'
 
 images:
   - 'asia-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/open-skill-nepal/open-skill-nepal:$COMMIT_SHA'
