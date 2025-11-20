@@ -5,20 +5,35 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware - FIXED CORS - UPDATED DOMAINS
+// Middleware - ENHANCED CORS CONFIGURATION
 app.use(cors({
-  origin: [
-    'https://open-skill-nepal.vercel.app', // ← ADDED - your current domain
-    'https://open-skill-nepal-qsq3idytx-dinesh-malliks-projects.vercel.app', // ← ADDED
-    'https://open-skill-nepal-4zc9-git-main-dinesh-mc.vercel.app',
-    'https://open-skill-nepal-4zc9-aej0wknbi-dinesh-1.vercel.app',
-    'http://localhost:3000'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    
+    // Allow all your Vercel domains and localhost
+    const allowedOrigins = [
+      'https://open-skill-nepal.vercel.app',
+      'https://open-skill-nepal-qsq3idytx-dinesh-malliks-projects.vercel.app',
+      'https://open-skill-nepal-4zc9-git-main-dinesh-mc.vercel.app',
+      'https://open-skill-nepal-4zc9-aej0wknbi-dinesh-1.vercel.app',
+      'http://localhost:3000'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('.vercel.app')) {
+      return callback(null, true);
+    } else {
+      console.log('🚫 CORS blocked origin:', origin);
+      return callback(new Error('CORS policy violation'), false);
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
-app.use(express.json());
 
 // Add request logging middleware
 app.use((req, res, next) => {
