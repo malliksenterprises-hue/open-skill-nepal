@@ -5,12 +5,20 @@ require('dotenv').config();
 
 const app = express();
 
-// TEMPORARY: COMPLETELY OPEN CORS - REMOVE AFTER TESTING
+// PRODUCTION CORS CONFIGURATION
 app.use(cors({
-  origin: '*', // Allow ALL origins
-  credentials: false, // No credentials for now
+  origin: [
+    'https://openskillnepal.com',
+    'https://www.openskillnepal.com',
+    'https://api.openskillnepal.com',
+    'https://open-skill-nepal.vercel.app',
+    'https://open-skill-nepal-qsq3idytx-dinesh-malliks-projects.vercel.app',
+    'http://localhost:3000'
+  ],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  optionsSuccessStatus: 204
 }));
 
 // Add request logging middleware
