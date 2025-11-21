@@ -1,5 +1,5 @@
-// Base API URL - FIXED: Use your Cloud Run backend
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://open-skill-nepal-669869115660.asia-south1.run.app/api'
+// Base API URL - Updated for production domain
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://api.openskillnepal.com/api'
 
 /**
  * Generic API request function
@@ -7,14 +7,14 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://open-skill-nepal-6
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`
   
-  console.log('🔗 API Request:', url) // Add logging
+  console.log('🔗 API Request:', url)
   
   const config = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    // REMOVED credentials line to fix CORS issues
+    // No credentials line - fixed CORS issues
     ...options,
   }
 
@@ -41,6 +41,8 @@ async function apiRequest(endpoint, options = {}) {
     throw error
   }
 }
+
+// ... rest of your authAPI and dashboardAPI exports remain the same
 
 /**
  * Authentication API methods
