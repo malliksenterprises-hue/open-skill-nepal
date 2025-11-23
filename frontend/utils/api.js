@@ -1,48 +1,48 @@
-// Base API URL - Updated for production domain
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://api.openskillnepal.com/api'
+// Use the DIRECT Cloud Run URL that we know works
+const API_BASE = 'https://open-skill-nepal-669869115660.asia-south1.run.app/api';
 
 /**
  * Generic API request function
  */
 async function apiRequest(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`
+  const url = `${API_BASE}${endpoint}`;
   
-  console.log('🔗 API Request:', url)
+  console.log('🔗 API Request:', url, options.body);
   
   const config = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    // No credentials line - fixed CORS issues
     ...options,
-  }
+  };
 
   // Add body if provided
   if (options.body) {
-    config.body = JSON.stringify(options.body)
+    config.body = JSON.stringify(options.body);
   }
 
   try {
-    const response = await fetch(url, config)
-    const data = await response.json()
-
+    console.log('🔄 Making fetch request...');
+    const response = await fetch(url, config);
+    
+    console.log('📨 Response status:', response.status);
+    
+    // Check if response is OK before parsing JSON
     if (!response.ok) {
-      throw {
-        message: data.message || 'API request failed',
-        status: response.status,
-        data: data
-      }
+      const errorText = await response.text();
+      console.error('❌ HTTP Error:', response.status, errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    return data
+    const data = await response.json();
+    console.log('✅ API Success:', data);
+    return data;
   } catch (error) {
-    console.error('❌ API request error:', error)
-    throw error
+    console.error('❌ API request failed:', error);
+    throw new Error(`Cannot connect to server: ${error.message}`);
   }
 }
-
-// ... rest of your authAPI and dashboardAPI exports remain the same
 
 /**
  * Authentication API methods
@@ -78,7 +78,7 @@ export const authAPI = {
         'Authorization': `Bearer ${token}`
       }
     })
-}
+};
 
 /**
  * Role-based dashboard data (mock for Phase 1)
@@ -148,4 +148,4 @@ export const dashboardAPI = {
         { id: 4, name: 'Web Development Basics' }
       ]
     })
-}
+};
