@@ -5,6 +5,27 @@ require('dotenv').config();
 
 const app = express();
 
+// =======================
+// ROOT ROUTE - ADDED HERE
+// =======================
+app.get('/', (req, res) => {
+  res.json({
+    message: '🚀 Open Skill Nepal Backend API',
+    status: 'running',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      mongodb: '/api/debug/mongodb',
+      dbStatus: '/api/debug/db-status',
+      test: '/api/test',
+      auth: '/api/auth'
+    },
+    documentation: 'https://github.com/malliksenterprises-hue/open-skill-nepal'
+  });
+});
+
 // PRODUCTION CORS CONFIGURATION
 app.use(cors({
   origin: [
