@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 const { ROLES } = require('../models/User');
 
 /**
@@ -26,35 +27,47 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔐 Login attempt for:', email);
+
     // Validation
     if (!email || !password) {
       return res.status(400).json({ 
-        message: 'Email and password are required' 
+        message: 'Email and password are required',
+        timestamp: new Date().toISOString()
       });
     }
 
-    // Find user by email
-    const user = await User.findByEmail(email);
+    // Find user by email using standard Mongoose method
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
+      console.log('❌ User not found:', email);
       return res.status(401).json({ 
-        message: 'Invalid email or password' 
+        message: 'Invalid email or password',
+        timestamp: new Date().toISOString()
       });
     }
+
+    console.log('✅ User found:', user.email, 'Role:', user.role);
 
     // Check if user is active
     if (!user.isActive) {
       return res.status(401).json({ 
-        message: 'Account is deactivated' 
+        message: 'Account is deactivated',
+        timestamp: new Date().toISOString()
       });
     }
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
+    // Verify password using bcrypt directly
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      console.log('❌ Invalid password for:', email);
       return res.status(401).json({ 
-        message: 'Invalid email or password' 
+        message: 'Invalid email or password',
+        timestamp: new Date().toISOString()
       });
     }
+
+    console.log('✅ Password valid for:', email);
 
     // Generate token
     const token = generateToken(user);
@@ -69,16 +82,21 @@ exports.login = async (req, res) => {
       school: user.school
     };
 
+    console.log('✅ Login successful for:', email);
+
     res.json({
       message: 'Login successful',
       token,
-      user: userResponse
+      user: userResponse,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({ 
-      message: 'Internal server error' 
+      message: 'Authentication failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -90,9 +108,12 @@ exports.googleLogin = async (req, res) => {
   try {
     const { name, email, googleId, avatar } = req.body;
 
+    console.log('🔐 Google login attempt for:', email);
+
     if (!email || !googleId) {
       return res.status(400).json({ 
-        message: 'Google authentication data is required' 
+        message: 'Google authentication data is required',
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -109,6 +130,7 @@ exports.googleLogin = async (req, res) => {
       if (!user.googleId) user.googleId = googleId;
       if (!user.avatar && avatar) user.avatar = avatar;
       await user.save();
+      console.log('✅ Existing Google user updated:', email);
     } else {
       // Create new user for students only via Google
       user = new User({
@@ -120,12 +142,14 @@ exports.googleLogin = async (req, res) => {
         password: undefined // No password for Google users
       });
       await user.save();
+      console.log('✅ New Google user created:', email);
     }
 
     // Check if user is active
     if (!user.isActive) {
       return res.status(401).json({ 
-        message: 'Account is deactivated' 
+        message: 'Account is deactivated',
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -141,16 +165,21 @@ exports.googleLogin = async (req, res) => {
       school: user.school
     };
 
+    console.log('✅ Google login successful for:', email);
+
     res.json({
       message: 'Google authentication successful',
       token,
-      user: userResponse
+      user: userResponse,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Google login error:', error);
+    console.error('❌ Google login error:', error);
     res.status(500).json({ 
-      message: 'Internal server error' 
+      message: 'Google authentication failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -160,12 +189,20 @@ exports.googleLogin = async (req, res) => {
  */
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+    }
     res.json(user);
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('❌ Get user error:', error);
     res.status(500).json({ 
-      message: 'Internal server error' 
+      message: 'Failed to get user profile',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -175,6 +212,7 @@ exports.getMe = async (req, res) => {
  */
 exports.logout = (req, res) => {
   res.json({ 
-    message: 'Logout successful - please remove token from client storage' 
+    message: 'Logout successful - please remove token from client storage',
+    timestamp: new Date().toISOString()
   });
 };
