@@ -2,25 +2,15 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
-# Copy package files
-COPY package*.json ./
-COPY backend/package*.json ./backend/
+# Copy ONLY backend package files
+COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install ONLY backend dependencies
+RUN npm install --only=production
 
-# Copy all source code
-COPY . .
-
-# Install backend dependencies
-RUN cd backend && npm install
-
-# Create non-root user (optional for Cloud Run)
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-
-USER nextjs
+# Copy ONLY backend source code
+COPY backend/ .
 
 EXPOSE 8080
 
-CMD ["node", "backend/server.js"]
+CMD ["node", "server.js"]
