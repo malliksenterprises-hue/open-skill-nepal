@@ -30,7 +30,7 @@ app.get('/', (req, res) => {
 });
 
 // =======================
-// SIMPLE AUTH ROUTE (NO DATABASE)
+// AUTHENTICATION ROUTES
 // =======================
 app.post('/api/auth/login', (req, res) => {
   try {
@@ -43,6 +43,7 @@ app.post('/api/auth/login', (req, res) => {
         message: 'Login successful!',
         token: 'test-token-123',
         user: {
+          _id: '1',
           name: 'Student User',
           email: 'student@example.com',
           role: 'student'
@@ -62,6 +63,55 @@ app.post('/api/auth/login', (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// GET CURRENT USER PROFILE
+app.get('/api/auth/me', (req, res) => {
+  res.json({
+    _id: '1',
+    name: 'Student User', 
+    email: 'student@example.com',
+    role: 'student',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// LOGOUT
+app.post('/api/auth/logout', (req, res) => {
+  res.json({
+    message: 'Logout successful',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// =======================
+// DASHBOARD ROUTES
+// =======================
+app.get('/api/dashboard/student', (req, res) => {
+  res.json({
+    enrolledCourses: [
+      {
+        id: 1,
+        name: 'Basic Mathematics',
+        progress: 75,
+        instructor: 'Dr. Sharma',
+        nextSession: '2024-01-15'
+      },
+      {
+        id: 2, 
+        name: 'English Literature',
+        progress: 60,
+        instructor: 'Ms. Gurung',
+        nextSession: '2024-01-16'
+      }
+    ],
+    performance: {
+      averageGrade: 'A-',
+      completedAssignments: 12,
+      attendance: '95%'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Health check
@@ -84,5 +134,5 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`✅ Authentication routes loaded`);
-  console.log(`✅ CORS configured for production domains`);
+  console.log(`✅ Dashboard routes loaded`);
 });
