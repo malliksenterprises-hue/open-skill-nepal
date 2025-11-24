@@ -3,8 +3,20 @@ const cors = require('cors');
 
 const app = express();
 
-// Basic middleware
-app.use(cors());
+// =======================
+// FIXED CORS CONFIGURATION
+// =======================
+app.use(cors({
+  origin: [
+    'https://openskillnepal.com',
+    'https://www.openskillnepal.com',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
+
 app.use(express.json());
 
 // =======================
@@ -72,4 +84,5 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`✅ Authentication routes loaded`);
+  console.log(`✅ CORS configured for production domains`);
 });
