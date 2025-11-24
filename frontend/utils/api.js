@@ -6,11 +6,11 @@
 // Environment-aware API base URL configuration
 const getApiBaseUrl = () => {
   // Priority 1: Environment variable (most professional)
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Priority 2: Direct Cloud Run URL (verified working)
+  // Priority 2: Direct Cloud Run URL (verified working) - UPDATED
   return 'https://open-skill-nepal-669869115660.asia-south1.run.app/api';
 };
 
@@ -34,6 +34,7 @@ async function apiRequest(endpoint, options = {}) {
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    credentials: 'include', // Important for cookies/auth
     // Professional timeout handling
     signal: AbortSignal.timeout(30000), // 30-second timeout
   };
