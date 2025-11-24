@@ -27,3 +27,7 @@ steps:
 substitutions:
   _MONGO_URI: "" # Will be set in Cloud Build triggers
   _JWT_SECRET: "" # Will be set in Cloud Build triggers
+
+# 🔥 CRITICAL FIX: Add this options section
+options:
+  logging: CLOUD_LOGGING_ONLY
