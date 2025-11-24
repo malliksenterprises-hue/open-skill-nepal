@@ -44,6 +44,16 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+// ADD THIS AT THE TOP after express() initialization
+app.post('/api/direct-test-login', (req, res) => {
+  console.log('✅ DIRECT TEST ROUTE HIT');
+  res.json({
+    message: 'DIRECT ROUTE WORKS - Auth routes file missing in deployment',
+    timestamp: new Date().toISOString(),
+    status: 'direct_test_success'
+  });
+});
+
 // 🔥 CRITICAL FIX: Add body-parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
