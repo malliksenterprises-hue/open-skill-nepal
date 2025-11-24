@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -51,6 +52,24 @@ app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
+
+// 🔥 DEBUG: Check if auth routes file exists
+console.log('🔍 Checking auth routes file...');
+try {
+  const fs = require('fs');
+  const routesPath = path.join(__dirname, 'routes', 'authRoutes.js');
+  const routesExists = fs.existsSync(routesPath);
+  console.log(`📁 Auth routes file exists: ${routesExists ? '✅ YES' : '❌ NO'}`);
+  console.log(`📁 Full path: ${routesPath}`);
+  
+  if (routesExists) {
+    console.log('📄 File content check passed');
+  } else {
+    console.log('💥 CRITICAL: authRoutes.js file not found in deployment!');
+  }
+} catch (error) {
+  console.log('💥 Error checking auth routes:', error.message);
+}
 
 // Enhanced MongoDB connection with better logging
 console.log('🔧 Initializing MongoDB connection...');
@@ -216,14 +235,36 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+// 🔥 DEBUG: Try to load auth routes with error handling
+console.log('🚀 Attempting to load auth routes...');
+try {
+  const authRoutes = require('./routes/authRoutes');
+  console.log('✅ Auth routes loaded successfully!');
+  
+  // Mount routes
+  app.use('/api/auth', authRoutes);
+  console.log('✅ Auth routes mounted at /api/auth');
+  
+} catch (error) {
+  console.error('💥 CRITICAL: Failed to load auth routes:', error.message);
+  console.error('💥 Stack trace:', error.stack);
+  
+  // Create fallback routes if authRoutes fails to load
+  app.post('/api/auth/login', (req, res) => {
+    res.status(500).json({
+      message: 'Auth routes failed to load - fallback route',
+      error: 'Check server logs',
+      timestamp: new Date().toISOString()
+    });
+  });
+}
 
-// 🔥 ADD DEBUG ROUTE TO VERIFY AUTH ROUTES WORK
-app.get('/api/auth/debug', (req, res) => {
+// 🔥 ADD DIRECT DEBUG ROUTE (not through authRoutes)
+app.get('/api/auth/direct-debug', (req, res) => {
   res.json({ 
-    message: 'Auth routes are working!',
-    timestamp: new Date().toISOString()
+    message: 'Direct debug route is working!',
+    timestamp: new Date().toISOString(),
+    status: 'success'
   });
 });
 
@@ -354,6 +395,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   - /api/debug/mongodb - MongoDB connection test`);
   console.log(`   - /api/debug/db-status - Database status`);
   console.log(`   - /api/test - Basic server test`);
-  console.log(`   - /api/auth/debug - Auth routes test`);
+  console.log(`   - /api/auth/direct-debug - Direct auth debug`);
   console.log(`\n📊 Auto-initialization: Will create sample users if database is empty`);
 });
