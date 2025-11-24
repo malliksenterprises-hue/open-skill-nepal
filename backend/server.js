@@ -42,6 +42,10 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+// 🔥 CRITICAL FIX: Add body-parser middleware
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
 // Add request logging middleware
 app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -215,6 +219,14 @@ process.on('uncaughtException', (error) => {
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 
+// 🔥 ADD DEBUG ROUTE TO VERIFY AUTH ROUTES WORK
+app.get('/api/auth/debug', (req, res) => {
+  res.json({ 
+    message: 'Auth routes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check with DB status
 app.get('/api/health', (req, res) => {
   const dbStatus = mongoose.connection.readyState;
@@ -342,5 +354,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   - /api/debug/mongodb - MongoDB connection test`);
   console.log(`   - /api/debug/db-status - Database status`);
   console.log(`   - /api/test - Basic server test`);
+  console.log(`   - /api/auth/debug - Auth routes test`);
   console.log(`\n📊 Auto-initialization: Will create sample users if database is empty`);
 });
