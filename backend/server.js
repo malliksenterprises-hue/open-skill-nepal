@@ -1,7 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
@@ -44,32 +45,14 @@ app.use(cors({
 }));
 
 // 🔥 CRITICAL FIX: Add body-parser middleware
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Add request logging middleware
 app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
-
-// 🔥 DEBUG: Check if auth routes file exists
-console.log('🔍 Checking auth routes file...');
-try {
-  const fs = require('fs');
-  const routesPath = path.join(__dirname, 'routes', 'authRoutes.js');
-  const routesExists = fs.existsSync(routesPath);
-  console.log(`📁 Auth routes file exists: ${routesExists ? '✅ YES' : '❌ NO'}`);
-  console.log(`📁 Full path: ${routesPath}`);
-  
-  if (routesExists) {
-    console.log('📄 File content check passed');
-  } else {
-    console.log('💥 CRITICAL: authRoutes.js file not found in deployment!');
-  }
-} catch (error) {
-  console.log('💥 Error checking auth routes:', error.message);
-}
 
 // Enhanced MongoDB connection with better logging
 console.log('🔧 Initializing MongoDB connection...');
@@ -114,28 +97,29 @@ mongoose.connection.on('disconnected', () => {
   console.log('⚠️ MongoDB Disconnected');
 });
 
+// User Schema (simplified)
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true },
+  role: { type: String, required: true },
+  isActive: { type: Boolean, default: true }
+}, { timestamps: true });
+
+const User = mongoose.model('User', userSchema);
+
 // Auto-create sample users when connection opens
 mongoose.connection.once('open', async () => {
   console.log('🔓 MongoDB connection open - checking for sample data...');
   
   try {
-    const User = require('./models/User');
-    
     // Check if any users exist
     const userCount = await User.countDocuments();
     console.log(`👥 Found ${userCount} existing users in database`);
     
     if (userCount === 0) {
-      console.log('📝 No users found, initializing sample data...');
-      
-      try {
-        const initData = require('./scripts/initData');
-        await initData();
-        console.log('🎉 Sample data initialization completed!');
-      } catch (initError) {
-        console.log('⚠️ Init script failed, creating users manually...');
-        await createSampleUsersManually();
-      }
+      console.log('📝 No users found, creating sample users...');
+      await createSampleUsersManually();
     } else {
       console.log('✅ Database already has users, skipping initialization');
       
@@ -151,44 +135,42 @@ mongoose.connection.once('open', async () => {
   }
 });
 
-// Manual user creation fallback
+// Manual user creation
 async function createSampleUsersManually() {
   try {
-    const User = require('./models/User');
-    
     const sampleUsers = [
       {
         name: 'Super Admin',
         email: 'superadmin@example.com',
-        password: 'password',
+        password: await bcrypt.hash('password', 12),
         role: 'super_admin',
         isActive: true
       },
       {
         name: 'Admin User',
         email: 'admin@example.com',
-        password: 'password',
+        password: await bcrypt.hash('password', 12),
         role: 'admin',
         isActive: true
       },
       {
         name: 'Teacher User',
         email: 'teacher@example.com',
-        password: 'password',
+        password: await bcrypt.hash('password', 12),
         role: 'teacher',
         isActive: true
       },
       {
         name: 'School Admin',
         email: 'school@example.com',
-        password: 'password',
+        password: await bcrypt.hash('password', 12),
         role: 'school_admin',
         isActive: true
       },
       {
         name: 'Student User',
         email: 'student@example.com',
-        password: 'password',
+        password: await bcrypt.hash('password', 12),
         role: 'student',
         isActive: true
       }
@@ -235,38 +217,235 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// 🔥 DEBUG: Try to load auth routes with error handling
-console.log('🚀 Attempting to load auth routes...');
-try {
-  const authRoutes = require('./routes/authRoutes');
-  console.log('✅ Auth routes loaded successfully!');
-  
-  // Mount routes
-  app.use('/api/auth', authRoutes);
-  console.log('✅ Auth routes mounted at /api/auth');
-  
-} catch (error) {
-  console.error('💥 CRITICAL: Failed to load auth routes:', error.message);
-  console.error('💥 Stack trace:', error.stack);
-  
-  // Create fallback routes if authRoutes fails to load
-  app.post('/api/auth/login', (req, res) => {
-    res.status(500).json({
-      message: 'Auth routes failed to load - fallback route',
-      error: 'Check server logs',
+// ==========================================
+// 🔥 AUTHENTICATION ROUTES - BUILT DIRECTLY
+// ==========================================
+
+// Generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      userId: user._id, 
+      email: user.email, 
+      role: user.role 
+    },
+    process.env.JWT_SECRET || 'fallback-secret-key',
+    { expiresIn: '7d' }
+  );
+};
+
+// Authentication middleware
+const authenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ 
+        message: 'Access token required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+    const user = await User.findById(decoded.userId).select('-password');
+    
+    if (!user || !user.isActive) {
+      return res.status(401).json({ 
+        message: 'User not found or inactive',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return res.status(403).json({ 
+      message: 'Invalid or expired token',
       timestamp: new Date().toISOString()
     });
-  });
-}
+  }
+};
 
-// 🔥 ADD DIRECT DEBUG ROUTE (not through authRoutes)
-app.get('/api/auth/direct-debug', (req, res) => {
+// LOGIN ROUTE
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    console.log('🔐 Login attempt for:', email);
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ 
+        message: 'Email and password are required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      console.log('❌ User not found:', email);
+      return res.status(401).json({ 
+        message: 'Invalid email or password',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log('✅ User found:', user.email, 'Role:', user.role);
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ 
+        message: 'Account is deactivated',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.log('❌ Invalid password for:', email);
+      return res.status(401).json({ 
+        message: 'Invalid email or password',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log('✅ Password valid for:', email);
+
+    // Generate token
+    const token = generateToken(user);
+
+    // Return user data (excluding password) and token
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar || '',
+      school: user.school || ''
+    };
+
+    console.log('✅ Login successful for:', email);
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: userResponse,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      message: 'Authentication failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// GET CURRENT USER PROFILE
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ 
+        message: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar || '',
+      school: user.school || ''
+    };
+    
+    res.json(userResponse);
+  } catch (error) {
+    console.error('❌ Get user error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get user profile',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// LOGOUT ROUTE
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
   res.json({ 
-    message: 'Direct debug route is working!',
-    timestamp: new Date().toISOString(),
-    status: 'success'
+    message: 'Logout successful - please remove token from client storage',
+    timestamp: new Date().toISOString()
   });
 });
+
+// GOOGLE LOGIN (Simplified)
+app.post('/api/auth/google-login', async (req, res) => {
+  try {
+    const { email, name, googleId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        message: 'Google authentication data is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Find or create user
+    let user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      // Create new user for students only via Google
+      user = new User({
+        name: name || 'Google User',
+        email: email.toLowerCase(),
+        password: await bcrypt.hash(googleId + Date.now(), 12), // Temporary password
+        role: 'student',
+        isActive: true
+      });
+      await user.save();
+      console.log('✅ New Google user created:', email);
+    }
+
+    // Generate token
+    const token = generateToken(user);
+
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar || '',
+      school: user.school || ''
+    };
+
+    res.json({
+      message: 'Google authentication successful',
+      token,
+      user: userResponse,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Google login error:', error);
+    res.status(500).json({ 
+      message: 'Google authentication failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ==========================================
+// EXISTING ROUTES (Keep all your current routes)
+// ==========================================
 
 // Health check with DB status
 app.get('/api/health', (req, res) => {
@@ -317,7 +496,6 @@ app.get('/api/debug/mongodb', async (req, res) => {
         debugInfo.ping = pingResult;
         
         // Test if we can access users collection
-        const User = require('./models/User');
         const userCount = await User.countDocuments();
         debugInfo.userCount = userCount;
       } catch (dbError) {
@@ -390,11 +568,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📚 Open Skill Nepal Backend Ready!`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔍 Debug endpoints available:`);
-  console.log(`   - /api/health - Health check`);
-  console.log(`   - /api/debug/mongodb - MongoDB connection test`);
-  console.log(`   - /api/debug/db-status - Database status`);
-  console.log(`   - /api/test - Basic server test`);
-  console.log(`   - /api/auth/direct-debug - Direct auth debug`);
-  console.log(`\n📊 Auto-initialization: Will create sample users if database is empty`);
+  console.log(`🔍 Authentication endpoints:`);
+  console.log(`   - POST /api/auth/login - User login`);
+  console.log(`   - GET  /api/auth/me - Get current user`);
+  console.log(`   - POST /api/auth/logout - User logout`);
+  console.log(`   - POST /api/auth/google-login - Google OAuth`);
+  console.log(`\n📧 Test credentials available - Login should now work!`);
 });
