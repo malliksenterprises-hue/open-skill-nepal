@@ -1,22 +1,26 @@
 const express = require('express');
-const multer = require('multer');
 const { requireRole } = require('../middleware/authMiddleware');
 const router = express.Router();
+const multer = require('multer');
+const { Storage } = require('@google-cloud/storage');
+const path = require('path');
 
-// Configure multer for video uploads (memory storage for now)
-const storage = multer.memoryStorage();
+// Configure Google Cloud Storage
+const storage = new Storage();
+const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+
+// Configure multer for file upload
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 500 * 1024 * 1024, // 500MB limit
-    files: 1
   },
   fileFilter: (req, file, cb) => {
-    // Check file type
-    if (file.mimetype.startsWith('video/')) {
+    const allowedTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/mov', 'video/wmv'];
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only video files are allowed'), false);
+      cb(new Error('Invalid file type. Only video files are allowed.'), false);
     }
   }
 });
@@ -24,253 +28,285 @@ const upload = multer({
 // Teacher: Upload and schedule video
 router.post('/upload', requireRole('teacher'), upload.single('video'), async (req, res) => {
   try {
-    const { title, description, subject, grade, scheduledFor, schoolId } = req.body;
+    const { title, description, scheduledFor, assignedSchools, subjects, gradeLevel } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No video file provided' });
+    }
+
+    if (!title || !scheduledFor) {
+      return res.status(400).json({ message: 'Title and scheduled time are required' });
+    }
+
     const Video = require('../models/Video');
     const School = require('../models/School');
+
+    // Validate assigned schools
+    const schools = JSON.parse(assignedSchools || '[]');
+    if (schools.length === 0) {
+      return res.status(400).json({ message: 'At least one school must be selected' });
+    }
+
+    // Check if teacher has access to these schools
+    const teacherSchools = await School.find({ teachers: req.user._id });
+    const accessibleSchoolIds = teacherSchools.map(school => school._id.toString());
     
-    // Validation
-    if (!title || !subject || !grade || !scheduledFor || !schoolId) {
-      return res.status(400).json({
-        message: 'Missing required fields: title, subject, grade, scheduledFor, schoolId'
-      });
+    const invalidSchools = schools.filter(schoolId => 
+      !accessibleSchoolIds.includes(schoolId)
+    );
+
+    if (invalidSchools.length > 0) {
+      return res.status(403).json({ message: 'Access denied to some selected schools' });
     }
 
-    // Verify teacher is assigned to this school
-    const school = await School.findOne({
-      _id: schoolId,
-      teachers: req.user._id
-    });
-    
-    if (!school) {
-      return res.status(403).json({ message: 'Not assigned to this school' });
-    }
-
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({ message: 'Video file is required' });
-    }
-
-    // In production: Upload to Google Cloud Storage
-    // For development: Store file info and use mock URL
-    const videoUrl = `https://storage.googleapis.com/openskillnepal-videos/${Date.now()}-${req.file.originalname}`;
-    const thumbnailUrl = `https://storage.googleapis.com/openskillnepal-thumbnails/${Date.now()}-thumb.jpg`;
-
-    const video = new Video({
-      title,
-      description,
-      subject,
-      grade,
-      teacher: req.user._id,
-      school: schoolId,
-      videoUrl,
-      thumbnailUrl,
-      scheduledFor: new Date(scheduledFor),
-      duration: Math.floor(Math.random() * 45) + 30, // 30-75 minutes mock
-      status: 'scheduled'
-    });
-
-    await video.save();
-
-    res.status(201).json({
-      message: 'Video uploaded and scheduled successfully!',
-      video: {
-        id: video._id,
-        title: video.title,
-        subject: video.subject,
-        grade: video.grade,
-        scheduledFor: video.scheduledFor,
-        status: video.status,
-        duration: video.duration
+    // Upload to Google Cloud Storage
+    const timestamp = Date.now();
+    const filename = `videos/${timestamp}-${req.file.originalname.replace(/\s+/g, '_')}`;
+    const blob = bucket.file(filename);
+    const blobStream = blob.createWriteStream({
+      metadata: {
+        contentType: req.file.mimetype,
       },
-      timestamp: new Date().toISOString()
     });
+
+    blobStream.on('error', (err) => {
+      console.error('GCS Upload Error:', err);
+      res.status(500).json({ message: 'Video upload failed' });
+    });
+
+    blobStream.on('finish', async () => {
+      try {
+        const fileUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+        
+        // Make the file publicly accessible
+        await blob.makePublic();
+
+        const video = new Video({
+          title,
+          description,
+          filename: req.file.originalname,
+          fileUrl,
+          fileSize: req.file.size,
+          teacher: req.user._id,
+          scheduledFor: new Date(scheduledFor),
+          assignedSchools: schools,
+          subjects: JSON.parse(subjects || '[]'),
+          gradeLevel: gradeLevel || 'all'
+        });
+
+        await video.save();
+
+        // Populate the response with teacher and school data
+        await video.populate('teacher', 'name');
+        await video.populate('assignedSchools', 'name');
+
+        res.status(201).json({
+          message: 'Video uploaded and scheduled successfully',
+          video: {
+            id: video._id,
+            title: video.title,
+            description: video.description,
+            fileUrl: video.fileUrl,
+            scheduledFor: video.scheduledFor,
+            status: video.status,
+            assignedSchools: video.assignedSchools,
+            teacher: video.teacher
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Video Save Error:', error);
+        res.status(500).json({ message: 'Failed to save video details', error: error.message });
+      }
+    });
+
+    blobStream.end(req.file.buffer);
   } catch (error) {
     console.error('Video Upload Error:', error);
-    res.status(500).json({
+    res.status(500).json({ 
       message: 'Video upload failed',
-      error: error.message
+      error: error.message 
     });
   }
 });
 
-// Get teacher's uploaded videos
+// Teacher: Get my uploaded videos
 router.get('/my-videos', requireRole('teacher'), async (req, res) => {
   try {
     const Video = require('../models/Video');
-    
-    const videos = await Video.find({ teacher: req.user._id })
-      .populate('school', 'name code')
-      .sort({ scheduledFor: -1 });
+    const { page = 1, limit = 10, status } = req.query;
+
+    const query = { teacher: req.user._id };
+    if (status && ['scheduled', 'live', 'completed'].includes(status)) {
+      query.status = status;
+    }
+
+    const videos = await Video.find(query)
+      .populate('assignedSchools', 'name code')
+      .sort({ scheduledFor: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Video.countDocuments(query);
 
     res.json({
       videos,
-      totalCount: videos.length,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      totalVideos: total,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Get My Videos Error:', error);
-    res.status(500).json({
+    res.status(500).json({ 
       message: 'Failed to fetch videos',
-      error: error.message
+      error: error.message 
     });
   }
 });
 
-// Get live classes for student
-router.get('/live', requireRole('student'), async (req, res) => {
+// School Admin: Get videos for their school
+router.get('/school-videos', requireRole('school_admin'), async (req, res) => {
   try {
-    // Check if student is approved
-    if (req.user.status !== 'approved') {
-      return res.status(403).json({
-        message: 'Account pending verification'
-      });
+    const Video = require('../models/Video');
+    const School = require('../models/School');
+    const { status, page = 1, limit = 10 } = req.query;
+
+    // Get school managed by this admin
+    const school = await School.findOne({ admin: req.user._id });
+    if (!school) {
+      return res.status(404).json({ message: 'School not found' });
     }
 
+    const query = { assignedSchools: school._id };
+    if (status && ['scheduled', 'live', 'completed'].includes(status)) {
+      query.status = status;
+    }
+
+    const videos = await Video.find(query)
+      .populate('teacher', 'name email avatar')
+      .populate('assignedSchools', 'name')
+      .sort({ scheduledFor: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Video.countDocuments(query);
+
+    // Get statistics
+    const stats = {
+      scheduled: await Video.countDocuments({ 
+        assignedSchools: school._id, 
+        status: 'scheduled' 
+      }),
+      live: await Video.countDocuments({ 
+        assignedSchools: school._id, 
+        status: 'live' 
+      }),
+      completed: await Video.countDocuments({ 
+        assignedSchools: school._id, 
+        status: 'completed' 
+      })
+    };
+
+    res.json({
+      videos,
+      stats,
+      school: { name: school.name, code: school.code },
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      totalVideos: total,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Get School Videos Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch school videos',
+      error: error.message 
+    });
+  }
+});
+
+// Student: Get accessible videos
+router.get('/student-videos', requireRole('student'), async (req, res) => {
+  try {
     const Video = require('../models/Video');
-    const now = new Date();
-    
-    const liveClasses = await Video.find({
-      school: req.user.school,
-      status: { $in: ['scheduled', 'live'] },
-      scheduledFor: {
-        $lte: new Date(now.getTime() + 30 * 60000), // 30 minutes buffer
-        $gte: new Date(now.getTime() - 120 * 60000) // Started within last 2 hours
-      }
-    }).populate('teacher', 'name')
-      .populate('school', 'name')
-      .sort({ scheduledFor: 1 });
+    const currentTime = new Date();
+
+    const [liveClasses, upcomingClasses, recordedClasses] = await Promise.all([
+      Video.getLiveClassesForSchool(req.user.school),
+      Video.getUpcomingClassesForSchool(req.user.school),
+      Video.find({
+        assignedSchools: req.user.school,
+        status: 'completed'
+      }).populate('teacher', 'name avatar')
+        .sort({ scheduledFor: -1 })
+        .limit(20)
+    ]);
 
     res.json({
       liveClasses,
+      upcomingClasses,
+      recordedClasses,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Get Live Classes Error:', error);
-    res.status(500).json({
-      message: 'Failed to fetch live classes',
-      error: error.message
+    console.error('Get Student Videos Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch videos',
+      error: error.message 
     });
   }
 });
 
-// Student: Join live class
-router.post('/:videoId/join', requireRole('student'), async (req, res) => {
+// Update video viewing progress
+router.post('/:videoId/view', requireRole('student'), async (req, res) => {
   try {
-    // Check if student is approved
-    if (req.user.status !== 'approved') {
-      return res.status(403).json({
-        message: 'Account pending verification'
-      });
-    }
-
+    const { durationWatched, completed } = req.body;
     const Video = require('../models/Video');
-    
-    const video = await Video.findById(req.params.videoId)
-      .populate('teacher', 'name')
-      .populate('school', 'name');
 
+    const video = await Video.findById(req.params.videoId);
     if (!video) {
-      return res.status(404).json({ message: 'Class not found' });
+      return res.status(404).json({ message: 'Video not found' });
     }
 
-    // Check if class is accessible to student's school
-    if (video.school._id.toString() !== req.user.school.toString()) {
-      return res.status(403).json({ message: 'Access denied to this class' });
+    // Check if student has access
+    if (!video.assignedSchools.includes(req.user.school)) {
+      return res.status(403).json({ message: 'Access denied to this video' });
     }
 
-    // Check if class is live or scheduled to start soon
-    const now = new Date();
-    const startTime = new Date(video.scheduledFor);
-    const endTime = new Date(startTime.getTime() + video.duration * 60000);
-
-    if (now < startTime) {
-      return res.status(400).json({
-        message: 'Class has not started yet',
-        startsIn: Math.floor((startTime - now) / 60000) // minutes
-      });
-    }
-
-    if (now > endTime) {
-      return res.status(400).json({
-        message: 'Class has ended',
-        videoUrl: video.videoUrl // Still allow access to recording
-      });
-    }
-
-    // Mark class as live if it's scheduled and has started
-    if (video.status === 'scheduled') {
-      video.status = 'live';
-      await video.save();
-    }
-
-    // Record attendance
-    const existingAttendance = video.attendees.find(
-      attendee => attendee.student.toString() === req.user._id.toString()
+    // Find existing view or create new one
+    const existingViewIndex = video.viewers.findIndex(
+      view => view.student.toString() === req.user._id.toString()
     );
 
-    if (!existingAttendance) {
-      video.attendees.push({
+    if (existingViewIndex > -1) {
+      // Update existing view
+      video.viewers[existingViewIndex].durationWatched = durationWatched || video.viewers[existingViewIndex].durationWatched;
+      video.viewers[existingViewIndex].completed = completed !== undefined ? completed : video.viewers[existingViewIndex].completed;
+      video.viewers[existingViewIndex].watchedAt = new Date();
+    } else {
+      // Create new view
+      video.viewers.push({
         student: req.user._id,
-        joinedAt: new Date(),
-        duration: 0,
-        completed: false
-      });
-      await video.save();
-    }
-
-    res.json({
-      message: 'Joined class successfully',
-      video: {
-        id: video._id,
-        title: video.title,
-        description: video.description,
-        videoUrl: video.videoUrl,
-        teacher: video.teacher.name,
-        school: video.school.name,
-        scheduledFor: video.scheduledFor,
-        duration: video.duration,
-        status: video.status
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Join Class Error:', error);
-    res.status(500).json({
-      message: 'Failed to join class',
-      error: error.message
-    });
-  }
-});
-
-// Get class recordings for student
-router.get('/recordings', requireRole('student'), async (req, res) => {
-  try {
-    if (req.user.status !== 'approved') {
-      return res.status(403).json({
-        message: 'Account pending verification'
+        durationWatched: durationWatched || 0,
+        completed: completed || false,
+        watchedAt: new Date()
       });
     }
 
-    const Video = require('../models/Video');
-    
-    const recordings = await Video.find({
-      school: req.user.school,
-      status: 'completed'
-    }).populate('teacher', 'name')
-      .populate('school', 'name')
-      .sort({ scheduledFor: -1 })
-      .limit(20);
+    await video.save();
 
     res.json({
-      recordings,
-      totalCount: recordings.length,
+      message: 'View progress updated',
+      durationWatched,
+      completed,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Get Recordings Error:', error);
-    res.status(500).json({
-      message: 'Failed to fetch recordings',
-      error: error.message
+    console.error('Update View Progress Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to update view progress',
+      error: error.message 
     });
   }
 });
