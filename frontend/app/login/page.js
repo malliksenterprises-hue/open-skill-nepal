@@ -5,40 +5,6 @@ import { useAuth } from '../../context/AuthContext'
 import Button from '../../components/Button'
 import Toast from '../../components/Toast'
 
-// Add this near the top of your login component
-const [registrationSuccess, setRegistrationSuccess] = useState(false);
-
-useEffect(() => {
-  // Check URL for registration success message
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('message') === 'registration_success') {
-    setRegistrationSuccess(true);
-    // Clean URL
-    window.history.replaceState({}, '', '/login');
-  }
-}, []);
-
-// Add this success message in your login form
-{registrationSuccess && (
-  <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
-    <div className="flex">
-      <div className="flex-shrink-0">
-        <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-        </svg>
-      </div>
-      <div className="ml-3">
-        <p className="text-sm font-medium text-green-800">
-          Registration successful! Your account is pending verification by your school admin.
-        </p>
-        <p className="text-sm text-green-700 mt-1">
-          You'll be able to login once your account is approved.
-        </p>
-      </div>
-    </div>
-  </div>
-)}
-
 /**
  * Login page component with email/password and Google OAuth
  */
@@ -47,12 +13,22 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState({ show: false, message: '', type: '' })
+  const [registrationSuccess, setRegistrationSuccess] = useState(false)
 
   const { login, googleLogin, isAuthenticated, user } = useAuth()
   const router = useRouter()
 
-  // Redirect if already authenticated
+  // Check for registration success message and redirect if authenticated
   useEffect(() => {
+    // Check URL for registration success message
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('message') === 'registration_success') {
+      setRegistrationSuccess(true)
+      // Clean URL
+      window.history.replaceState({}, '', '/login')
+    }
+
+    // Redirect if already authenticated
     if (isAuthenticated && user) {
       const dashboardPath = `/dashboard/${user.role}`
       router.push(dashboardPath)
@@ -127,6 +103,27 @@ export default function Login() {
           </p>
         </div>
 
+        {/* Registration Success Message */}
+        {registrationSuccess && (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  Registration successful! Your account is pending verification by your school admin.
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  You'll be able to login once your account is approved.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Login Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
@@ -144,6 +141,7 @@ export default function Login() {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div>
@@ -160,7 +158,16 @@ export default function Login() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <a href="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
+                Forgot your password?
+              </a>
             </div>
           </div>
 
@@ -168,7 +175,7 @@ export default function Login() {
             <Button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign in with Email'}
             </Button>
@@ -189,7 +196,7 @@ export default function Login() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -209,6 +216,7 @@ export default function Login() {
                 type="button"
                 onClick={() => router.push('/signup')}
                 className="font-medium text-primary-600 hover:text-primary-500"
+                disabled={loading}
               >
                 Sign up with Google
               </button>
@@ -219,12 +227,12 @@ export default function Login() {
         {/* Demo Credentials */}
         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
           <h3 className="text-sm font-medium text-yellow-800">Demo Credentials:</h3>
-          <ul className="mt-2 text-xs text-yellow-700 list-disc list-inside">
-            <li>Super Admin: superadmin@example.com / password</li>
-            <li>Admin: admin@example.com / password</li>
-            <li>Teacher: teacher@example.com / password</li>
-            <li>School Admin: school@example.com / password</li>
-            <li>Student: student@example.com / password</li>
+          <ul className="mt-2 text-xs text-yellow-700 list-disc list-inside space-y-1">
+            <li><strong>Super Admin:</strong> superadmin@example.com / password</li>
+            <li><strong>Admin:</strong> admin@example.com / password</li>
+            <li><strong>Teacher:</strong> teacher@example.com / password</li>
+            <li><strong>School Admin:</strong> school@example.com / password</li>
+            <li><strong>Student:</strong> student@example.com / password</li>
           </ul>
         </div>
       </div>
