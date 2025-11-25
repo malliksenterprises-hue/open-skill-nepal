@@ -1,16 +1,31 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
-export default function DashboardLayout({ children, user }) {
+export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('dashboard');
+  const { user, logout } = useAuth();
   const router = useRouter();
 
+  // Redirect if no user
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+    }
+  }, [user, router]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logout();
     router.push('/login');
   };
 
@@ -28,52 +43,52 @@ export default function DashboardLayout({ children, user }) {
   // Role-based navigation items
   const getNavigationItems = () => {
     const baseItems = [
-      { name: 'Dashboard', href: '#', icon: '📊', id: 'dashboard' }
+      { name: 'Dashboard', href: `/dashboard/${user.role}`, icon: '📊', id: 'dashboard' }
     ];
 
     switch (user.role) {
       case 'super_admin':
         return [
           ...baseItems,
-          { name: 'Schools', href: '#schools', icon: '🏫', id: 'schools' },
-          { name: 'Admins', href: '#admins', icon: '⚡', id: 'admins' },
-          { name: 'System Stats', href: '#stats', icon: '📈', id: 'stats' },
+          { name: 'Schools', href: '/dashboard/super-admin/schools', icon: '🏫', id: 'schools' },
+          { name: 'Admins', href: '/dashboard/super-admin/admins', icon: '⚡', id: 'admins' },
+          { name: 'System Stats', href: '/dashboard/super-admin/stats', icon: '📈', id: 'stats' },
         ];
       
       case 'admin':
         return [
           ...baseItems,
-          { name: 'Pending Schools', href: '#pending-schools', icon: '⏳', id: 'pending-schools' },
-          { name: 'Teachers', href: '#teachers', icon: '👨‍🏫', id: 'teachers' },
-          { name: 'School Assignments', href: '#assignments', icon: '🎯', id: 'assignments' },
+          { name: 'Pending Schools', href: '/dashboard/admin/pending-schools', icon: '⏳', id: 'pending-schools' },
+          { name: 'Teachers', href: '/dashboard/admin/teachers', icon: '👨‍🏫', id: 'teachers' },
+          { name: 'School Assignments', href: '/dashboard/admin/assignments', icon: '🎯', id: 'assignments' },
         ];
       
       case 'school_admin':
         return [
           ...baseItems,
-          { name: 'Student Verification', href: '#verification', icon: '✅', id: 'verification' },
-          { name: 'Students', href: '#students', icon: '🎓', id: 'students' },
-          { name: 'Teachers', href: '#teachers', icon: '👨‍🏫', id: 'teachers' },
-          { name: 'Class Schedule', href: '#schedule', icon: '📅', id: 'schedule' },
-          { name: 'Videos', href: '#videos', icon: '🎥', id: 'videos' },
+          { name: 'Student Verification', href: '/dashboard/school-admin/verification', icon: '✅', id: 'verification' },
+          { name: 'Students', href: '/dashboard/school-admin/students', icon: '🎓', id: 'students' },
+          { name: 'Teachers', href: '/dashboard/school-admin/teachers', icon: '👨‍🏫', id: 'teachers' },
+          { name: 'Class Schedule', href: '/dashboard/school-admin/schedule', icon: '📅', id: 'schedule' },
+          { name: 'Videos', href: '/dashboard/school-admin/videos', icon: '🎥', id: 'videos' },
         ];
       
       case 'teacher':
         return [
           ...baseItems,
-          { name: 'Upload Video', href: '#upload', icon: '📹', id: 'upload' },
-          { name: 'My Videos', href: '#my-videos', icon: '🎬', id: 'my-videos' },
-          { name: 'Schedule', href: '#schedule', icon: '📅', id: 'schedule' },
-          { name: 'Analytics', href: '#analytics', icon: '📈', id: 'analytics' },
+          { name: 'Upload Video', href: '/dashboard/teacher/upload', icon: '📹', id: 'upload' },
+          { name: 'My Videos', href: '/dashboard/teacher/videos', icon: '🎬', id: 'my-videos' },
+          { name: 'Schedule', href: '/dashboard/teacher/schedule', icon: '📅', id: 'schedule' },
+          { name: 'Analytics', href: '/dashboard/teacher/analytics', icon: '📈', id: 'analytics' },
         ];
       
       case 'student':
         return [
           ...baseItems,
-          { name: 'Live Classes', href: '#live', icon: '🔴', id: 'live' },
-          { name: 'Upcoming', href: '#upcoming', icon: '⏰', id: 'upcoming' },
-          { name: 'Recorded', href: '#recorded', icon: '📼', id: 'recorded' },
-          { name: 'My Progress', href: '#progress', icon: '📊', id: 'progress' },
+          { name: 'Live Classes', href: '/dashboard/student/live', icon: '🔴', id: 'live' },
+          { name: 'Upcoming', href: '/dashboard/student/upcoming', icon: '⏰', id: 'upcoming' },
+          { name: 'Recorded', href: '/dashboard/student/recorded', icon: '📼', id: 'recorded' },
+          { name: 'My Progress', href: '/dashboard/student/progress', icon: '📊', id: 'progress' },
         ];
       
       default:
@@ -96,7 +111,7 @@ export default function DashboardLayout({ children, user }) {
           <p className="text-gray-400 text-sm">Welcome,</p>
           <p className="text-white font-medium truncate">{user.name}</p>
           <p className="text-gray-400 text-xs">{getRoleDisplay(user.role)}</p>
-          {user.role === 'student' && (
+          {user.role === 'student' && user.status && (
             <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
               user.status === 'approved' ? 'bg-green-100 text-green-800' :
               user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -110,10 +125,15 @@ export default function DashboardLayout({ children, user }) {
         {/* Navigation */}
         <nav className="mt-5 px-2 space-y-1">
           {navigationItems.map((item) => (
-            <button
+            <a
               key={item.id}
-              onClick={() => setActiveNav(item.id)}
-              className={`w-full text-left group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors ${
+              href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveNav(item.id);
+                router.push(item.href);
+              }}
+              className={`group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors ${
                 activeNav === item.id
                   ? 'bg-gray-900 text-white'
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -121,7 +141,7 @@ export default function DashboardLayout({ children, user }) {
             >
               <span className="mr-3 text-lg">{item.icon}</span>
               {item.name}
-            </button>
+            </a>
           ))}
         </nav>
       </div>
@@ -160,7 +180,7 @@ export default function DashboardLayout({ children, user }) {
 
         {/* Page content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4">
-          {React.cloneElement(children, { activeNav, user })}
+          {children}
         </main>
       </div>
     </div>
