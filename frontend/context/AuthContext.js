@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, useState, useEffect } from 'react'
-import { authAPI } from '../utils/api'
+// ✅ FIXED: Use proper path alias
+import { authAPI } from '@/utils/api'
 
 // Create Auth Context
 const AuthContext = createContext()
