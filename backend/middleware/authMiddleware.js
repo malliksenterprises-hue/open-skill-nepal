@@ -1,57 +1,85 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-/**
- * Middleware to verify JWT token from Authorization header
- * Attaches user to request object if token is valid
- */
-const authenticateToken = async (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
     if (!token) {
       return res.status(401).json({ 
-        message: 'Access token required' 
+        message: 'No token provided, access denied',
+        code: 'NO_TOKEN'
       });
     }
 
-    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Find user and attach to request
     const user = await User.findById(decoded.userId).select('-password');
-    if (!user || !user.isActive) {
+    
+    if (!user) {
       return res.status(401).json({ 
-        message: 'User not found or inactive' 
+        message: 'Token is invalid, user not found',
+        code: 'INVALID_TOKEN'
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ 
+        message: 'Account is deactivated',
+        code: 'ACCOUNT_DEACTIVATED'
+      });
+    }
+
+    // For students, check if they are approved
+    if (user.role === 'student' && user.status !== 'approved') {
+      return res.status(403).json({ 
+        message: 'Account pending approval from school admin',
+        status: user.status,
+        code: 'PENDING_APPROVAL'
       });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-    return res.status(403).json({ 
-      message: 'Invalid or expired token' 
+    console.error('Auth Middleware Error:', error.message);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        message: 'Invalid token',
+        code: 'INVALID_TOKEN'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        message: 'Token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+
+    res.status(500).json({ 
+      message: 'Server error in authentication',
+      code: 'AUTH_SERVER_ERROR'
     });
   }
 };
 
-/**
- * Middleware to check if user has required role
- * @param {...String} roles - Allowed roles
- */
-const requireRole = (...roles) => {
+const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
-        message: 'Authentication required' 
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED'
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+    
+    if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ 
-        message: 'Insufficient permissions' 
+        message: `Access denied. Required role: ${allowedRoles.join(' or ')}`,
+        userRole: req.user.role,
+        code: 'ROLE_ACCESS_DENIED'
       });
     }
 
@@ -59,7 +87,25 @@ const requireRole = (...roles) => {
   };
 };
 
+// Specific role middlewares for convenience
+const requireStudent = requireRole('student');
+const requireTeacher = requireRole('teacher');
+const requireSchoolAdmin = requireRole('school_admin');
+const requireAdmin = requireRole('admin');
+const requireSuperAdmin = requireRole('super_admin');
+
+// Combined role middlewares
+const requireSchoolStaff = requireRole(['school_admin', 'teacher']);
+const requireAnyAdmin = requireRole(['admin', 'super_admin']);
+
 module.exports = {
-  authenticateToken,
-  requireRole
+  auth,
+  requireRole,
+  requireStudent,
+  requireTeacher,
+  requireSchoolAdmin,
+  requireAdmin,
+  requireSuperAdmin,
+  requireSchoolStaff,
+  requireAnyAdmin
 };
