@@ -1,14 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // REMOVE output: 'export' - this is for static sites only
   trailingSlash: true,
   images: {
     unoptimized: true
   },
-  // Add these for better compatibility
-  experimental: {
-    appDir: true
-  },
+  // REMOVE experimental.appDir - It's now default in Next.js 14
   // Enable CORS for your backend
   async headers() {
     return [
@@ -21,6 +17,14 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  // Add webpack config for path aliases
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname),
+    }
+    return config
   }
 }
 
