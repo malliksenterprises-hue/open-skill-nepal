@@ -1,728 +1,659 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useAuth } from '../../../context/AuthContext';
+import { useState, useEffect } from 'react';
+import DashboardLayout from '../../../../components/DashboardLayout';
 
-export default function TeacherDashboard() {
-  const { user } = useAuth();
+export default function TeacherDashboard({ activeNav, user }) {
   const [dashboardData, setDashboardData] = useState(null);
+  const [myVideos, setMyVideos] = useState([]);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadLoading, setUploadLoading] = useState(false);
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
     title: '',
     description: '',
-    subject: 'mathematics',
-    grade: '10',
     scheduledFor: '',
-    schoolId: ''
+    assignedSchools: [],
+    subjects: [],
+    gradeLevel: 'all',
+    videoFile: null
   });
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    fetchTeacherData();
+  }, [activeNav]);
 
-  const fetchDashboardData = async () => {
+  const fetchTeacherData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/dashboard/teacher', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      
+      // Fetch dashboard stats
+      if (activeNav === 'dashboard' || !activeNav) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/teacher`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDashboardData(data);
         }
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch dashboard data');
       }
-      
-      setDashboardData(data);
-      // Set school ID for upload form
-      if (data.school) {
-        setUploadForm(prev => ({ ...prev, schoolId: data.school._id }));
+
+      // Fetch teacher's videos
+      if (['my-videos', 'dashboard', 'upload'].includes(activeNav)) {
+        const videosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/my-videos`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (videosResponse.ok) {
+          const videosData = await videosResponse.json();
+          setMyVideos(videosData.videos || []);
+        }
       }
-    } catch (err) {
-      console.error('Dashboard error:', err);
+
+      // Fetch available schools for assignment
+      if (activeNav === 'upload') {
+        const schoolsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/schools/assigned`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (schoolsResponse.ok) {
+          const schoolsData = await schoolsResponse.json();
+          setSchools(schoolsData.schools || []);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error fetching teacher data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUploadSubmit = async (e) => {
+  const handleUploadFormChange = (field, value) => {
+    setUploadForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (500MB limit)
+      if (file.size > 500 * 1024 * 1024) {
+        alert('File size must be less than 500MB');
+        return;
+      }
+      
+      // Check file type
+      const allowedTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/mov', 'video/wmv'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please select a valid video file (MP4, MKV, AVI, MOV, WMV)');
+        return;
+      }
+
+      setUploadForm(prev => ({
+        ...prev,
+        videoFile: file
+      }));
+    }
+  };
+
+  const handleVideoUpload = async (e) => {
     e.preventDefault();
-    setUploadLoading(true);
+    if (!uploadForm.videoFile) {
+      alert('Please select a video file');
+      return;
+    }
+
+    setUploading(true);
 
     try {
       const token = localStorage.getItem('token');
       const formData = new FormData();
       
-      // Add form fields
-      Object.keys(uploadForm).forEach(key => {
-        formData.append(key, uploadForm[key]);
-      });
+      formData.append('video', uploadForm.videoFile);
+      formData.append('title', uploadForm.title);
+      formData.append('description', uploadForm.description);
+      formData.append('scheduledFor', uploadForm.scheduledFor);
+      formData.append('assignedSchools', JSON.stringify(uploadForm.assignedSchools));
+      formData.append('subjects', JSON.stringify(uploadForm.subjects));
+      formData.append('gradeLevel', uploadForm.gradeLevel);
 
-      // Add video file (mock for now - would be actual file input)
-      const mockVideoFile = new Blob(['mock video content'], { type: 'video/mp4' });
-      formData.append('video', mockVideoFile, 'class-video.mp4');
-
-      const response = await fetch('/api/videos/upload', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/upload`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}',
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        body: formData
+        body: formData,
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to upload video');
-      }
-      
-      alert('Video uploaded and scheduled successfully!');
-      setShowUploadModal(false);
-      setUploadForm({
-        title: '',
-        description: '',
-        subject: 'mathematics',
-        grade: '10',
-        scheduledFor: '',
-        schoolId: uploadForm.schoolId
-      });
-      
-      // Refresh dashboard data
-      await fetchDashboardData();
-      
-    } catch (err) {
-      alert('Upload error: ' + err.message);
-    } finally {
-      setUploadLoading(false);
-    }
-  };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setUploadForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
+      if (response.ok) {
+        const result = await response.json();
+        alert('Video uploaded and scheduled successfully!');
+        setShowUploadForm(false);
+        setUploadForm({
+          title: '',
+          description: '',
+          scheduledFor: '',
+          assignedSchools: [],
+          subjects: [],
+          gradeLevel: 'all',
+          videoFile: null
+        });
+        fetchTeacherData(); // Refresh the list
+      } else {
+        const error = await response.json();
+        alert(`Upload failed: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      scheduled: { color: 'blue', text: 'Scheduled' },
-      live: { color: 'red', text: 'Live Now' },
-      completed: { color: 'green', text: 'Completed' },
-      cancelled: { color: 'gray', text: 'Cancelled' }
+      scheduled: { color: 'bg-blue-100 text-blue-800', icon: '⏰' },
+      live: { color: 'bg-red-100 text-red-800', icon: '🔴' },
+      completed: { color: 'bg-green-100 text-green-800', icon: '✅' }
     };
     
-    const config = statusConfig[status] || { color: 'gray', text: status };
+    const config = statusConfig[status] || statusConfig.scheduled;
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${config.color}-100 text-${config.color}-800`}>
-        {config.text}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+        <span className="mr-1">{config.icon}</span>
+        {status}
       </span>
     );
   };
 
-  const formatScheduleDate = (dateString) => {
-    const date = new Date(dateString);
-    return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString(),
-      full: date.toLocaleString()
-    };
-  };
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <DashboardLayout user={user}>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      </DashboardLayout>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Teacher Dashboard</h1>
-            <p className="text-gray-600 mt-1">
-              Welcome, {user.name} • {dashboardData?.school?.name}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              School Code: {dashboardData?.school?.code}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Upload & Schedule Class
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-            <h3 className="text-lg font-semibold text-blue-900">Total Uploads</h3>
-            <p className="text-3xl font-bold text-blue-600 mt-2">
-              {dashboardData?.stats?.totalUploads || 0}
-            </p>
-            <p className="text-blue-700 text-sm mt-1">All time</p>
-          </div>
-          
-          <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-            <h3 className="text-lg font-semibold text-orange-900">Scheduled</h3>
-            <p className="text-3xl font-bold text-orange-600 mt-2">
-              {dashboardData?.stats?.scheduledClasses || 0}
-            </p>
-            <p className="text-orange-700 text-sm mt-1">Upcoming</p>
-          </div>
-          
-          <div className="bg-red-50 rounded-lg p-4 border border-red-100">
-            <h3 className="text-lg font-semibold text-red-900">Live Now</h3>
-            <p className="text-3xl font-bold text-red-600 mt-2">
-              {dashboardData?.stats?.liveClasses || 0}
-            </p>
-            <p className="text-red-700 text-sm mt-1">Currently active</p>
-          </div>
-          
-          <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-            <h3 className="text-lg font-semibold text-green-900">Completed</h3>
-            <p className="text-3xl font-bold text-green-600 mt-2">
-              {dashboardData?.stats?.completedClasses || 0}
-            </p>
-            <p className="text-green-700 text-sm mt-1">Finished</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="border-b">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'overview'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('my-videos')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'my-videos'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              My Videos
-            </button>
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'schedule'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Class Schedule
-            </button>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'analytics'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Analytics
-            </button>
-          </nav>
-        </div>
-
-        {/* Tab Content */}
-        <div className="p-6">
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Quick Actions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Schedule New Class</h3>
-                  <p className="text-blue-700 text-sm mb-4">
-                    Upload a video and schedule it for future delivery as a live class.
-                  </p>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-                  >
-                    Upload Video
-                  </button>
-                </div>
-
-                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-green-900 mb-2">View Schedule</h3>
-                  <p className="text-green-700 text-sm mb-4">
-                    See all your upcoming classes and manage your teaching schedule.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('schedule')}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
-                  >
-                    View Schedule
-                  </button>
-                </div>
-              </div>
-
-              {/* Recent Uploads */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Uploads</h3>
-                {!dashboardData?.myVideos?.length ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <div className="text-gray-400 text-4xl mb-3">📹</div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Videos Uploaded</h3>
-                    <p className="text-gray-500">Get started by uploading your first video class.</p>
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Upload First Video
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {dashboardData.myVideos.slice(0, 4).map((video) => {
-                      const schedule = formatScheduleDate(video.scheduledFor);
-                      return (
-                        <div key={video._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-semibold text-gray-900">{video.title}</h4>
-                            {getStatusBadge(video.status)}
-                          </div>
-                          
-                          <p className="text-gray-600 text-sm mb-3 line-clamp-2">{video.description}</p>
-                          
-                          <div className="space-y-2 text-sm text-gray-500">
-                            <div className="flex justify-between">
-                              <span>Subject:</span>
-                              <span className="capitalize font-medium">{video.subject}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Grade:</span>
-                              <span>Grade {video.grade}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Scheduled:</span>
-                              <span>{schedule.date} at {schedule.time}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex space-x-2 mt-4">
-                            <button
-                              onClick={() => window.open(video.videoUrl, '_blank')}
-                              className="flex-1 bg-gray-100 text-gray-700 py-2 px-3 rounded text-sm font-medium hover:bg-gray-200"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => {/* Edit functionality */}}
-                              className="flex-1 bg-blue-100 text-blue-700 py-2 px-3 rounded text-sm font-medium hover:bg-blue-200"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+  const renderDashboard = () => {
+    switch (activeNav) {
+      case 'dashboard':
+        return (
+          <div className="space-y-6">
+            {/* Welcome Card */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Welcome back, {user.name}!
+              </h1>
+              <p className="text-gray-600">
+                {dashboardData?.school ? `Teaching at ${dashboardData.school.name}` : 'Ready to create amazing content!'}
+              </p>
             </div>
-          )}
 
-          {/* My Videos Tab */}
-          {activeTab === 'my-videos' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">My Video Library</h3>
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  New Upload
-                </button>
-              </div>
-
-              {!dashboardData?.myVideos?.length ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <div className="text-gray-400 text-6xl mb-4">🎬</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Videos Yet</h3>
-                  <p className="text-gray-500 mb-4">Start building your video library by uploading your first class.</p>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    Upload Your First Video
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {dashboardData.myVideos.map((video) => {
-                    const schedule = formatScheduleDate(video.scheduledFor);
-                    return (
-                      <div key={video._id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex-1">
-                            <h4 className="text-xl font-semibold text-gray-900 mb-2">{video.title}</h4>
-                            <p className="text-gray-600 mb-3">{video.description}</p>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                              <div>
-                                <span className="font-medium text-gray-900">Subject</span>
-                                <p className="capitalize">{video.subject}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-900">Grade</span>
-                                <p>Grade {video.grade}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-900">Duration</span>
-                                <p>{video.duration} minutes</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-900">Status</span>
-                                <div className="mt-1">{getStatusBadge(video.status)}</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center pt-4 border-t">
-                          <div className="text-sm text-gray-500">
-                            Scheduled: {schedule.full}
-                            {video.school && ` • School: ${video.school.name}`}
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => window.open(video.videoUrl, '_blank')}
-                              className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
-                            >
-                              Watch Video
-                            </button>
-                            <button
-                              onClick={() => {/* Edit functionality */}}
-                              className="bg-gray-100 text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-200"
-                            >
-                              Edit Details
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Schedule Tab */}
-          {activeTab === 'schedule' && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Class Schedule</h3>
-              
-              {!dashboardData?.schedule?.length ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <div className="text-gray-400 text-6xl mb-4">📅</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Scheduled Classes</h3>
-                  <p className="text-gray-500 mb-4">Schedule your first class to see it here.</p>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    Schedule a Class
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {dashboardData.schedule.map((video) => {
-                    const schedule = formatScheduleDate(video.scheduledFor);
-                    const isUpcoming = new Date(video.scheduledFor) > new Date();
-                    
-                    return (
-                      <div key={video._id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex-1">
-                            <h4 className="text-xl font-semibold text-gray-900 mb-2">{video.title}</h4>
-                            <p className="text-gray-600 mb-3">{video.description}</p>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium text-gray-900">Date & Time</span>
-                                <p className="text-gray-600">{schedule.full}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-900">Subject & Grade</span>
-                                <p className="text-gray-600 capitalize">{video.subject} • Grade {video.grade}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-900">Duration</span>
-                                <p className="text-gray-600">{video.duration} minutes</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {getStatusBadge(video.status)}
-                            {isUpcoming && (
-                              <p className="text-sm text-gray-500 mt-2">
-                                In {Math.ceil((new Date(video.scheduledFor) - new Date()) / (1000 * 60 * 60 * 24))} days
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center pt-4 border-t">
-                          <div className="text-sm text-gray-500">
-                            Class ID: {video._id} • School: {video.school?.name}
-                          </div>
-                          <div className="flex space-x-2">
-                            {video.status === 'scheduled' && (
-                              <button
-                                onClick={() => {/* Reschedule functionality */}}
-                                className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-orange-700"
-                              >
-                                Reschedule
-                              </button>
-                            )}
-                            <button
-                              onClick={() => window.open(video.videoUrl, '_blank')}
-                              className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
-                            >
-                              {video.status === 'completed' ? 'Watch Recording' : 'Preview Video'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Analytics Tab */}
-          {activeTab === 'analytics' && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Teaching Analytics</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-white border rounded-lg p-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Class Distribution</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Scheduled Classes</span>
-                      <span className="font-semibold">{dashboardData?.stats?.scheduledClasses || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Live Classes</span>
-                      <span className="font-semibold">{dashboardData?.stats?.liveClasses || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Completed Classes</span>
-                      <span className="font-semibold">{dashboardData?.stats?.completedClasses || 0}</span>
-                    </div>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-blue-100 rounded-lg mr-4">
+                    <span className="text-2xl">🎬</span>
                   </div>
-                </div>
-
-                <div className="bg-white border rounded-lg p-6">
-                  <h4 className="font-semibold text-gray-900 mb-4">Subject Breakdown</h4>
-                  <div className="space-y-3">
-                    {dashboardData?.myVideos?.reduce((acc, video) => {
-                      acc[video.subject] = (acc[video.subject] || 0) + 1;
-                      return acc;
-                    }, {}) && Object.entries(dashboardData.myVideos.reduce((acc, video) => {
-                      acc[video.subject] = (acc[video.subject] || 0) + 1;
-                      return acc;
-                    }, {})).map(([subject, count]) => (
-                      <div key={subject} className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 capitalize">{subject}</span>
-                        <span className="font-semibold">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <div className="flex items-start">
-                  <div className="text-blue-400 text-xl mr-3">📊</div>
                   <div>
-                    <h4 className="font-semibold text-blue-900">Analytics Coming Soon</h4>
-                    <p className="text-blue-700 text-sm mt-1">
-                      Detailed analytics including student attendance, engagement metrics, 
-                      and performance insights will be available in the next update.
+                    <p className="text-sm font-medium text-gray-600">Total Videos</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {dashboardData?.stats?.totalVideos || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-green-100 rounded-lg mr-4">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {dashboardData?.stats?.completedVideos || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-red-100 rounded-lg mr-4">
+                    <span className="text-2xl">🔴</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Live Now</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {dashboardData?.stats?.liveVideos || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-purple-100 rounded-lg mr-4">
+                    <span className="text-2xl">👁️</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Views</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {dashboardData?.stats?.totalViews || 0}
                     </p>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">Upload & Schedule Class</h2>
+            {/* Recent Videos */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6 border-b flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Recent Videos</h2>
+                <button
+                  onClick={() => setShowUploadForm(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors"
+                >
+                  Upload New Video
+                </button>
+              </div>
+              <div className="p-6">
+                {myVideos.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🎥</div>
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No Videos Yet</h3>
+                    <p className="text-gray-500 mb-4">Start by uploading your first video!</p>
+                    <button
+                      onClick={() => setShowUploadForm(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                    >
+                      Upload Your First Video
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {myVideos.slice(0, 5).map((video) => (
+                      <div key={video._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg mb-1">{video.title}</h3>
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-1">{video.description}</p>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <span>📅 {new Date(video.scheduledFor).toLocaleString()}</span>
+                            <span>🏫 {video.assignedSchools?.length || 0} schools</span>
+                            <span>👁️ {video.viewers?.length || 0} views</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          {getStatusBadge(video.status)}
+                          <span className="text-sm text-gray-500">
+                            {Math.floor(video.duration / 60)} min
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {myVideos.length > 5 && (
+                      <div className="text-center pt-4">
+                        <button
+                          onClick={() => {/* Navigate to my-videos */}}
+                          className="text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                          View All Videos →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            
-            <form onSubmit={handleUploadSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Video Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={uploadForm.title}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter class title"
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={uploadForm.description}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Describe what this class is about"
-                />
+            {/* Upcoming Schedule */}
+            {dashboardData?.upcomingVideos && dashboardData.upcomingVideos.length > 0 && (
+              <div className="bg-white rounded-lg shadow">
+                <div className="p-6 border-b">
+                  <h2 className="text-xl font-semibold">Upcoming Schedule</h2>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {dashboardData.upcomingVideos.map((video) => (
+                      <div key={video._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                        <div>
+                          <p className="font-medium">{video.title}</p>
+                          <p className="text-sm text-gray-500">
+                            {video.assignedSchools?.map(school => school.name).join(', ')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">
+                            {new Date(video.scheduledFor).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(video.scheduledFor).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
+        );
 
-              <div className="grid grid-cols-2 gap-4">
+      case 'upload':
+        return (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold">Upload New Video</h2>
+              <p className="text-gray-600 mt-1">Schedule a video for simulated live delivery.</p>
+            </div>
+            <div className="p-6">
+              <form onSubmit={handleVideoUpload} className="max-w-2xl space-y-6">
+                {/* Video File */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject *
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Video File *
                   </label>
-                  <select
-                    name="subject"
-                    value={uploadForm.subject}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="mathematics">Mathematics</option>
-                    <option value="science">Science</option>
-                    <option value="english">English</option>
-                    <option value="nepali">Nepali</option>
-                    <option value="social">Social Studies</option>
-                    <option value="computer">Computer</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="video-upload"
+                      required
+                    />
+                    <label htmlFor="video-upload" className="cursor-pointer">
+                      <div className="text-4xl mb-2">📹</div>
+                      <p className="text-lg font-medium text-gray-900">
+                        {uploadForm.videoFile ? uploadForm.videoFile.name : 'Choose video file'}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        MP4, MKV, AVI, MOV, WMV (Max 500MB)
+                      </p>
+                    </label>
+                  </div>
+                  {uploadForm.videoFile && (
+                    <p className="text-sm text-green-600 mt-2">
+                      ✓ Selected: {uploadForm.videoFile.name} ({(uploadForm.videoFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </p>
+                  )}
                 </div>
 
+                {/* Title */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Grade *
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Video Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadForm.title}
+                    onChange={(e) => handleUploadFormChange('title', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Enter video title"
+                    required
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={uploadForm.description}
+                    onChange={(e) => handleUploadFormChange('description', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Describe your video content"
+                    rows="3"
+                  />
+                </div>
+
+                {/* Schedule */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Schedule Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={uploadForm.scheduledFor}
+                    onChange={(e) => handleUploadFormChange('scheduledFor', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    required
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+
+                {/* Assigned Schools */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign to Schools *
+                  </label>
+                  <div className="space-y-2">
+                    {schools.map((school) => (
+                      <label key={school._id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={uploadForm.assignedSchools.includes(school._id)}
+                          onChange={(e) => {
+                            const schoolId = school._id;
+                            setUploadForm(prev => ({
+                              ...prev,
+                              assignedSchools: e.target.checked
+                                ? [...prev.assignedSchools, schoolId]
+                                : prev.assignedSchools.filter(id => id !== schoolId)
+                            }));
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">
+                          {school.name} ({school.code})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {uploadForm.assignedSchools.length === 0 && (
+                    <p className="text-sm text-red-600 mt-1">Please select at least one school</p>
+                  )}
+                </div>
+
+                {/* Subjects */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subjects
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {['mathematics', 'science', 'english', 'nepali', 'social', 'computer', 'other'].map((subject) => (
+                      <label key={subject} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={uploadForm.subjects.includes(subject)}
+                          onChange={(e) => {
+                            setUploadForm(prev => ({
+                              ...prev,
+                              subjects: e.target.checked
+                                ? [...prev.subjects, subject]
+                                : prev.subjects.filter(s => s !== subject)
+                            }));
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700 capitalize">
+                          {subject}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grade Level */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Grade Level
                   </label>
                   <select
-                    name="grade"
-                    value={uploadForm.grade}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={uploadForm.gradeLevel}
+                    onChange={(e) => handleUploadFormChange('gradeLevel', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(grade => (
-                      <option key={grade} value={grade.toString()}>
-                        Grade {grade}
-                      </option>
+                    <option value="all">All Grades</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
+                      <option key={grade} value={grade.toString()}>Grade {grade}</option>
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Schedule Date & Time *
-                </label>
-                <input
-                  type="datetime-local"
-                  name="scheduledFor"
-                  value={uploadForm.scheduledFor}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Video File *
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
-                  <div className="text-gray-400 text-4xl mb-2">📹</div>
-                  <p className="text-gray-600 mb-2">Click to select video file</p>
-                  <p className="text-gray-500 text-sm">MP4, MOV, AVI up to 500MB</p>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    // File input would be implemented here
-                  />
+                {/* Submit Button */}
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadForm(false)}
+                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploading || !uploadForm.videoFile || uploadForm.assignedSchools.length === 0}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    {uploading ? (
+                      <span className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Uploading...
+                      </span>
+                    ) : (
+                      'Schedule Video'
+                    )}
+                  </button>
                 </div>
-              </div>
+              </form>
+            </div>
+          </div>
+        );
 
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploadLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50"
-                >
-                  {uploadLoading ? (
-                    <span className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Uploading...
-                    </span>
-                  ) : (
-                    'Schedule Class'
-                  )}
-                </button>
-              </div>
-            </form>
+      case 'my-videos':
+        return (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">My Videos</h2>
+              <button
+                onClick={() => setShowUploadForm(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Upload New Video
+              </button>
+            </div>
+            <div className="p-6">
+              {myVideos.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🎥</div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">No Videos Yet</h3>
+                  <p className="text-gray-500 mb-4">Start by uploading your first video!</p>
+                  <button
+                    onClick={() => setShowUploadForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                  >
+                    Upload Your First Video
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Video
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Scheduled For
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Schools
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Views
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Duration
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {myVideos.map((video) => (
+                        <tr key={video._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{video.title}</div>
+                              <div className="text-sm text-gray-500 line-clamp-1">{video.description}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(video.status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(video.scheduledFor).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {video.assignedSchools?.length || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {video.viewers?.length || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {Math.floor(video.duration / 60)} min
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Teacher Dashboard</h2>
+            <p>Use the navigation to manage your videos and schedule classes.</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <DashboardLayout user={user}>
+      {renderDashboard()}
+      
+      {/* Upload Modal */}
+      {showUploadForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold">Upload & Schedule Video</h3>
+              <button
+                onClick={() => setShowUploadForm(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            {renderDashboard()}
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }
