@@ -5,6 +5,40 @@ import { useAuth } from '../../context/AuthContext'
 import Button from '../../components/Button'
 import Toast from '../../components/Toast'
 
+// Add this near the top of your login component
+const [registrationSuccess, setRegistrationSuccess] = useState(false);
+
+useEffect(() => {
+  // Check URL for registration success message
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('message') === 'registration_success') {
+    setRegistrationSuccess(true);
+    // Clean URL
+    window.history.replaceState({}, '', '/login');
+  }
+}, []);
+
+// Add this success message in your login form
+{registrationSuccess && (
+  <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+    <div className="flex">
+      <div className="flex-shrink-0">
+        <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <div className="ml-3">
+        <p className="text-sm font-medium text-green-800">
+          Registration successful! Your account is pending verification by your school admin.
+        </p>
+        <p className="text-sm text-green-700 mt-1">
+          You'll be able to login once your account is approved.
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
 /**
  * Login page component with email/password and Google OAuth
  */
