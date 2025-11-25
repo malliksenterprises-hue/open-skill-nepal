@@ -5,7 +5,7 @@ const Video = require('../models/Video');
 const updateVideoStatuses = async () => {
   try {
     const now = new Date();
-    console.log(`Running video status update at: ${now.toISOString()}`);
+    console.log(`⏰ Running video status update at: ${now.toISOString()}`);
 
     // Update scheduled videos to live when their time comes
     const liveResult = await Video.updateMany(
@@ -33,10 +33,10 @@ const updateVideoStatuses = async () => {
     );
 
     if (liveResult.modifiedCount > 0 || completedResult.modifiedCount > 0) {
-      console.log(`Video status update completed: ${liveResult.modifiedCount} set to live, ${completedResult.modifiedCount} set to completed`);
+      console.log(`✅ Video status update: ${liveResult.modifiedCount} set to live, ${completedResult.modifiedCount} set to completed`);
     }
   } catch (error) {
-    console.error('Error updating video statuses:', error);
+    console.error('❌ Error updating video statuses:', error);
   }
 };
 
@@ -44,6 +44,7 @@ const updateVideoStatuses = async () => {
 cron.schedule('* * * * *', updateVideoStatuses);
 
 // Also run immediately on server start
+console.log('⏰ Video status updater cron job initialized');
 updateVideoStatuses();
 
 module.exports = updateVideoStatuses;
