@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import DashboardLayout from '../../../../components/DashboardLayout';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function TeacherDashboard({ activeNav, user }) {
   const [dashboardData, setDashboardData] = useState(null);
