@@ -20,14 +20,20 @@ steps:
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
+    - '--port'
+    - '8080'
     - '--set-env-vars'
-    - 'MONGO_URI=$_MONGO_URI,JWT_SECRET=$_JWT_SECRET'
+    - 'NODE_ENV=production,PORT=8080,MONGO_URI=$_MONGO_URI,JWT_SECRET=$_JWT_SECRET,GCS_BUCKET_NAME=$_GCS_BUCKET_NAME,FRONTEND_URL=https://openskillnepal.com'
+    - '--timeout'
+    - '300s'
+    - '--memory'
+    - '512Mi'
 
 # Store secrets securely as Cloud Build substitutions
 substitutions:
   _MONGO_URI: "" # Will be set in Cloud Build triggers
   _JWT_SECRET: "" # Will be set in Cloud Build triggers
+  _GCS_BUCKET_NAME: "" # Will be set in Cloud Build triggers
 
-# 🔥 CRITICAL FIX: Add this options section
 options:
   logging: CLOUD_LOGGING_ONLY
