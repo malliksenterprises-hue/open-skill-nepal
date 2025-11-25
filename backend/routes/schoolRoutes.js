@@ -2,8 +2,8 @@ const express = require('express');
 const { requireRole } = require('../middleware/authMiddleware');
 const router = express.Router();
 
-// Get all schools (for super admin and student signup)
-router.get('/', async (req, res) => {
+// Get all active schools (for student signup)
+router.get('/active', async (req, res) => {
   try {
     const School = require('../models/School');
     
@@ -17,83 +17,140 @@ router.get('/', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Get Schools Error:', error);
-    res.status(500).json({
+    console.error('Get Active Schools Error:', error);
+    res.status(500).json({ 
       message: 'Failed to fetch schools',
-      error: error.message
+      error: error.message 
     });
   }
 });
 
-// Super Admin: Create new school
-router.post('/', requireRole('super_admin'), async (req, res) => {
+// Get schools assigned to teacher
+router.get('/assigned', requireRole('teacher'), async (req, res) => {
   try {
-    const { name, code, address, contact, deviceLimit, adminId } = req.body;
+    const School = require('../models/School');
+    
+    const schools = await School.find({ 
+      teachers: req.user._id,
+      status: 'active'
+    }).select('name code address');
+
+    res.json({
+      schools,
+      totalCount: schools.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Get Assigned Schools Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch assigned schools',
+      error: error.message 
+    });
+  }
+});
+
+// Get schools for admin management
+router.get('/admin-schools', requireRole('admin'), async (req, res) => {
+  try {
+    const School = require('../models/School');
+    const { status, page = 1, limit = 10 } = req.query;
+
+    const query = {};
+    if (status && ['active', 'pending', 'inactive'].includes(status)) {
+      query.status = status;
+    }
+
+    const schools = await School.find(query)
+      .populate('admin', 'name email')
+      .populate('teachers', 'name email')
+      .populate('students', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await School.countDocuments(query);
+
+    res.json({
+      schools,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      totalSchools: total,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Get Admin Schools Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch schools',
+      error: error.message 
+    });
+  }
+});
+
+// Assign teacher to school (Admin only)
+router.post('/:schoolId/assign-teacher', requireRole('admin'), async (req, res) => {
+  try {
+    const { teacherId } = req.body;
     const School = require('../models/School');
     const User = require('../models/User');
 
-    // Validation
-    if (!name || !code || !adminId) {
-      return res.status(400).json({
-        message: 'Required fields: name, code, adminId'
-      });
-    }
-
-    // Check if admin exists and is an admin role
-    const admin = await User.findOne({
-      _id: adminId,
-      role: 'admin'
+    // Check if teacher exists
+    const teacher = await User.findOne({ 
+      _id: teacherId, 
+      role: 'teacher' 
     });
-
-    if (!admin) {
-      return res.status(400).json({ message: 'Invalid admin user' });
+    
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher not found' });
     }
 
-    // Check if school code already exists
-    const existingSchool = await School.findOne({ code: code.toUpperCase() });
-    if (existingSchool) {
-      return res.status(400).json({ message: 'School code already exists' });
+    const school = await School.findById(req.params.schoolId);
+    if (!school) {
+      return res.status(404).json({ message: 'School not found' });
     }
 
-    const school = new School({
-      name,
-      code: code.toUpperCase(),
-      address,
-      contact,
-      deviceLimit: deviceLimit || 100,
-      admin: adminId,
-      status: 'active'
-    });
+    // Check if teacher is already assigned
+    if (school.teachers.includes(teacherId)) {
+      return res.status(400).json({ message: 'Teacher already assigned to this school' });
+    }
 
+    // Add teacher to school
+    school.teachers.push(teacherId);
     await school.save();
 
-    res.status(201).json({
-      message: 'School created successfully',
+    // Update teacher's school reference
+    teacher.school = school._id;
+    await teacher.save();
+
+    res.json({
+      message: 'Teacher assigned to school successfully',
       school: {
         id: school._id,
         name: school.name,
-        code: school.code,
-        admin: admin.name,
-        status: school.status
+        teachers: school.teachers
+      },
+      teacher: {
+        id: teacher._id,
+        name: teacher.name,
+        email: teacher.email
       },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Create School Error:', error);
-    res.status(500).json({
-      message: 'Failed to create school',
-      error: error.message
+    console.error('Assign Teacher Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to assign teacher',
+      error: error.message 
     });
   }
 });
 
-// Super Admin: Update school status
-router.patch('/:schoolId/status', requireRole('super_admin'), async (req, res) => {
+// Update school status (Admin only)
+router.patch('/:schoolId/status', requireRole('admin'), async (req, res) => {
   try {
     const { status } = req.body;
     const School = require('../models/School');
 
-    if (!['active', 'inactive', 'pending'].includes(status)) {
+    if (!['active', 'pending', 'inactive'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
@@ -114,68 +171,75 @@ router.patch('/:schoolId/status', requireRole('super_admin'), async (req, res) =
         name: school.name,
         code: school.code,
         status: school.status,
-        admin: school.admin.name
+        admin: school.admin
       },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Update School Status Error:', error);
-    res.status(500).json({
+    res.status(500).json({ 
       message: 'Failed to update school status',
-      error: error.message
+      error: error.message 
     });
   }
 });
 
-// Admin: Assign teacher to school
-router.post('/:schoolId/teachers', requireRole('admin'), async (req, res) => {
+// Get school statistics
+router.get('/:schoolId/stats', requireRole('school_admin'), async (req, res) => {
   try {
-    const { teacherId } = req.body;
     const School = require('../models/School');
     const User = require('../models/User');
-
-    // Check if teacher exists
-    const teacher = await User.findOne({
-      _id: teacherId,
-      role: 'teacher'
-    });
-
-    if (!teacher) {
-      return res.status(400).json({ message: 'Invalid teacher' });
-    }
+    const Video = require('../models/Video');
 
     const school = await School.findById(req.params.schoolId);
     if (!school) {
       return res.status(404).json({ message: 'School not found' });
     }
 
-    // Check if teacher already assigned
-    if (school.teachers.includes(teacherId)) {
-      return res.status(400).json({ message: 'Teacher already assigned to this school' });
+    // Verify the requesting user is admin of this school
+    if (school.admin.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied to this school' });
     }
 
-    school.teachers.push(teacherId);
-    await school.save();
+    const [
+      totalStudents,
+      pendingStudents,
+      approvedStudents,
+      totalTeachers,
+      totalVideos,
+      liveVideos
+    ] = await Promise.all([
+      User.countDocuments({ school: school._id, role: 'student' }),
+      User.countDocuments({ school: school._id, role: 'student', status: 'pending' }),
+      User.countDocuments({ school: school._id, role: 'student', status: 'approved' }),
+      User.countDocuments({ school: school._id, role: 'teacher' }),
+      Video.countDocuments({ assignedSchools: school._id }),
+      Video.countDocuments({ assignedSchools: school._id, status: 'live' })
+    ]);
 
     res.json({
-      message: 'Teacher assigned to school successfully',
       school: {
         id: school._id,
         name: school.name,
-        code: school.code
+        code: school.code,
+        deviceLimit: school.deviceLimit
       },
-      teacher: {
-        id: teacher._id,
-        name: teacher.name,
-        email: teacher.email
+      stats: {
+        totalStudents,
+        pendingStudents,
+        approvedStudents,
+        totalTeachers,
+        totalVideos,
+        liveVideos,
+        deviceUsage: Math.round((totalStudents / school.deviceLimit) * 100)
       },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Assign Teacher Error:', error);
-    res.status(500).json({
-      message: 'Failed to assign teacher',
-      error: error.message
+    console.error('Get School Stats Error:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch school statistics',
+      error: error.message 
     });
   }
 });
