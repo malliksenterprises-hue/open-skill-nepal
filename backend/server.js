@@ -25,13 +25,13 @@ app.use(cors({
 }));
 
 // =======================
-// BODY PARSER MIDDLEWARE
+// BODY PARSER MIDDLEWARE - ENHANCED FOR VIDEO UPLOADS
 // =======================
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' })); // Increased for video metadata
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // =======================
-// REQUEST LOGGING MIDDLEWARE
+// REQUEST LOGGING MIDDLEWARE - ENHANCED FOR PHASE 2
 // =======================
 app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.originalUrl} - IP: ${req.ip}`);
@@ -49,6 +49,13 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '2.0.0',
     phase: '2 - Dashboard & Live Classes',
+    features: {
+      studentVerification: true,
+      videoUpload: true,
+      liveClasses: true,
+      roleDashboards: true,
+      cronJobs: true
+    },
     endpoints: {
       auth: '/api/auth/*',
       dashboard: '/api/dashboard/*',
@@ -63,7 +70,7 @@ app.get('/', (req, res) => {
 });
 
 // =======================
-// MONGODB CONNECTION - ENHANCED
+// MONGODB CONNECTION - ENHANCED FOR PHASE 2
 // =======================
 console.log('🔧 Initializing MongoDB connection for Phase 2...');
 console.log('📝 MongoDB URI present:', process.env.MONGO_URI ? '✅ Yes' : '❌ No');
@@ -80,7 +87,7 @@ const mongooseOptions = {
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
-  maxPoolSize: 20, // Increased for Phase 2
+  maxPoolSize: 25, // Increased for Phase 2 video operations
   retryWrites: true,
   w: 'majority',
   ssl: true,
@@ -123,18 +130,21 @@ async function connectDB() {
 }
 
 // =======================
-// PHASE 2 SAMPLE DATA INITIALIZATION
+// PHASE 2 SAMPLE DATA INITIALIZATION - ENHANCED WITH VIDEOS
 // =======================
 async function initializePhase2SampleData() {
   try {
     const User = require('./models/User');
     const School = require('./models/School');
+    const Video = require('./models/Video');
     
     const userCount = await User.countDocuments();
     const schoolCount = await School.countDocuments();
+    const videoCount = await Video.countDocuments();
     
     console.log(`👥 Found ${userCount} users in database`);
     console.log(`🏫 Found ${schoolCount} schools in database`);
+    console.log(`🎥 Found ${videoCount} videos in database`);
     
     if (userCount === 0 || schoolCount === 0) {
       console.log('📝 Initializing Phase 2 sample data...');
@@ -148,9 +158,25 @@ async function initializePhase2SampleData() {
       schools.forEach(school => {
         console.log(`   - ${school.name} (${school.code}) - ${school.status}`);
       });
+
+      // Initialize cron jobs even if data exists
+      initializeCronJobs();
     }
   } catch (error) {
     console.log('💥 Error during Phase 2 sample data check:', error.message);
+  }
+}
+
+// =======================
+// CRON JOBS INITIALIZATION FOR VIDEO STATUS UPDATES
+// =======================
+function initializeCronJobs() {
+  try {
+    console.log('⏰ Initializing Phase 2 cron jobs...');
+    require('./cron/videoStatusUpdater');
+    console.log('✅ Cron jobs initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize cron jobs:', error.message);
   }
 }
 
@@ -158,6 +184,7 @@ async function createPhase2SampleData() {
   try {
     const User = require('./models/User');
     const School = require('./models/School');
+    const Video = require('./models/Video');
     
     // Create sample schools first
     const schools = [
@@ -247,6 +274,21 @@ async function createPhase2SampleData() {
           ]
         }
       },
+      // Science Teacher for KMSS
+      {
+        name: 'Science Teacher',
+        email: 'science.teacher@kmss.edu.np',
+        password: await bcrypt.hash('password', 12),
+        role: 'teacher',
+        school: createdSchools[0]._id,
+        isActive: true,
+        profile: {
+          subjects: ['science'],
+          qualifications: [
+            { degree: 'M.Sc Physics', institution: 'Kathmandu University', year: 2019 }
+          ]
+        }
+      },
       // Approved Student for KMSS
       {
         name: 'Approved Student',
@@ -271,9 +313,11 @@ async function createPhase2SampleData() {
       }
     ];
 
+    const createdUsers = {};
     for (const userData of sampleUsers) {
       const user = new User(userData);
       await user.save();
+      createdUsers[user.role] = user;
       
       // Update school with admin/teacher/student references
       if (user.school) {
@@ -291,14 +335,78 @@ async function createPhase2SampleData() {
       console.log(`✅ Created user: ${user.email} (${user.role}) - School: ${user.school ? 'Yes' : 'No'}`);
     }
 
+    // Create sample videos for Phase 2 testing
+    console.log('🎥 Creating sample videos for Phase 2...');
+    
+    const sampleVideos = [
+      {
+        title: 'Introduction to Algebra',
+        description: 'Basic concepts of algebraic expressions and equations',
+        filename: 'algebra-intro.mp4',
+        fileUrl: 'https://storage.googleapis.com/openskillnepal-videos/sample-algebra.mp4',
+        teacher: createdUsers.teacher._id,
+        subjects: ['mathematics'],
+        gradeLevel: '9',
+        scheduledFor: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
+        status: 'scheduled',
+        assignedSchools: [createdSchools[0]._id],
+        duration: 1800, // 30 minutes
+        fileSize: 157286400 // 150MB
+      },
+      {
+        title: 'Physics: Laws of Motion',
+        description: 'Understanding Newton\'s laws with practical examples',
+        filename: 'physics-motion.mp4',
+        fileUrl: 'https://storage.googleapis.com/openskillnepal-videos/sample-physics.mp4',
+        teacher: createdUsers.teacher._id,
+        subjects: ['science'],
+        gradeLevel: '10',
+        scheduledFor: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago (should be live)
+        status: 'live',
+        assignedSchools: [createdSchools[0]._id],
+        duration: 2700, // 45 minutes
+        fileSize: 209715200 // 200MB
+      },
+      {
+        title: 'Mathematics: Geometry Basics',
+        description: 'Fundamental concepts of geometry and shapes',
+        filename: 'geometry-basics.mp4',
+        fileUrl: 'https://storage.googleapis.com/openskillnepal-videos/sample-geometry.mp4',
+        teacher: createdUsers.teacher._id,
+        subjects: ['mathematics'],
+        gradeLevel: '8',
+        scheduledFor: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago (should be completed)
+        status: 'completed',
+        assignedSchools: [createdSchools[0]._id],
+        duration: 2400, // 40 minutes
+        fileSize: 188743680 // 180MB
+      }
+    ];
+
+    for (const videoData of sampleVideos) {
+      const video = new Video(videoData);
+      await video.save();
+      console.log(`✅ Created video: ${video.title} (${video.status})`);
+    }
+
     console.log('🎉 Phase 2 sample data initialization completed!');
+    
+    // Initialize cron jobs after sample data creation
+    initializeCronJobs();
+
     console.log('\n📧 Phase 2 Test Credentials:');
     console.log('   👑 Super Admin: superadmin@example.com / password');
     console.log('   ⚡ Admin: admin@example.com / password');
     console.log('   🏫 School Admin: schooladmin@kmss.edu.np / password');
     console.log('   👨‍🏫 Teacher: math.teacher@kmss.edu.np / password');
+    console.log('   👨‍🏫 Science Teacher: science.teacher@kmss.edu.np / password');
     console.log('   ✅ Approved Student: student.approved@kmss.edu.np / password');
     console.log('   ⏳ Pending Student: student.pending@kmss.edu.np / password');
+    
+    console.log('\n🎥 Sample Videos Created:');
+    console.log('   📹 Introduction to Algebra (Scheduled)');
+    console.log('   📹 Physics: Laws of Motion (Live)');
+    console.log('   📹 Mathematics: Geometry Basics (Completed)');
     
   } catch (error) {
     console.error('❌ Phase 2 sample data creation failed:', error.message);
@@ -309,7 +417,7 @@ async function createPhase2SampleData() {
 connectDB();
 
 // =======================
-// ROUTE IMPORTS - PHASE 2
+// ROUTE IMPORTS - PHASE 2 COMPLETE
 // =======================
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -318,7 +426,7 @@ const videoRoutes = require('./routes/videoRoutes');
 const schoolRoutes = require('./routes/schoolRoutes');
 
 // =======================
-// ROUTE MOUNTING - PHASE 2
+// ROUTE MOUNTING - PHASE 2 COMPLETE
 // =======================
 console.log('🛣️  Mounting Phase 2 routes...');
 
@@ -345,9 +453,9 @@ console.log('   ✅ School routes mounted at /api/schools');
 console.log('🎯 All Phase 2 routes mounted successfully!');
 
 // =======================
-// EXISTING HEALTH & DEBUG ROUTES
+// ENHANCED HEALTH & DEBUG ROUTES FOR PHASE 2
 // =======================
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const dbStatusText = {
     0: 'disconnected',
@@ -356,9 +464,14 @@ app.get('/api/health', (req, res) => {
     3: 'disconnecting'
   }[dbStatus] || 'unknown';
   
+  // Check cron job status
+  const cron = require('node-cron');
+  const cronStatus = cron.getTasks().size > 0 ? 'active' : 'inactive';
+  
   res.json({ 
     status: dbStatus === 1 ? 'healthy' : 'unhealthy',
     database: dbStatusText,
+    cronJobs: cronStatus,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     uptime: process.uptime(),
@@ -367,7 +480,9 @@ app.get('/api/health', (req, res) => {
       studentVerification: true,
       liveClasses: true,
       roleDashboards: true,
-      schoolManagement: true
+      schoolManagement: true,
+      videoUpload: true,
+      cronJobs: true
     }
   });
 });
@@ -393,6 +508,17 @@ app.get('/api/debug/phase2', async (req, res) => {
       { $match: { role: 'student' } },
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
+
+    const videoStats = await Video.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+    
+    // Check cron jobs
+    const cron = require('node-cron');
+    const cronTasks = Array.from(cron.getTasks()).map(([pattern, task]) => ({
+      pattern,
+      running: task.getStatus() === 'scheduled'
+    }));
     
     res.json({
       phase: 2,
@@ -401,7 +527,12 @@ app.get('/api/debug/phase2', async (req, res) => {
         totalSchools: schoolCount,
         totalVideos: videoCount,
         usersByRole: userStats,
-        studentsByStatus: studentStats
+        studentsByStatus: studentStats,
+        videosByStatus: videoStats
+      },
+      cronJobs: {
+        active: cron.getTasks().size > 0,
+        tasks: cronTasks
       },
       routes: {
         auth: '/api/auth/*',
@@ -421,7 +552,7 @@ app.get('/api/debug/phase2', async (req, res) => {
   }
 });
 
-// MongoDB Debug Endpoint
+// Enhanced MongoDB Debug Endpoint for Phase 2
 app.get('/api/debug/mongodb', async (req, res) => {
   try {
     const dbStatus = mongoose.connection.readyState;
@@ -439,7 +570,12 @@ app.get('/api/debug/mongodb', async (req, res) => {
       connectionName: mongoose.connection.name,
       mongoURIPresent: !!process.env.MONGO_URI,
       timestamp: new Date().toISOString(),
-      phase: 2
+      phase: 2,
+      features: {
+        videoSupport: true,
+        studentVerification: true,
+        liveClasses: true
+      }
     };
     
     if (dbStatus === 1) {
@@ -458,6 +594,12 @@ app.get('/api/debug/mongodb', async (req, res) => {
           schools: await School.countDocuments(),
           videos: await Video.countDocuments()
         };
+
+        // Get video status distribution
+        debugInfo.videoStatus = await Video.aggregate([
+          { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]);
+
       } catch (dbError) {
         debugInfo.dbError = dbError.message;
       }
@@ -473,14 +615,15 @@ app.get('/api/debug/mongodb', async (req, res) => {
 });
 
 // =======================
-// ERROR HANDLING MIDDLEWARE
+// ERROR HANDLING MIDDLEWARE - ENHANCED FOR PHASE 2
 // =======================
 app.use('/api/*', (req, res) => {
   console.log(`❌ 404 - API route not found: ${req.originalUrl}`);
   res.status(404).json({ 
     message: 'API route not found',
     path: req.originalUrl,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    phase: 2
   });
 });
 
@@ -489,26 +632,33 @@ app.use((err, req, res, next) => {
   res.status(500).json({ 
     message: 'Something went wrong!',
     error: process.env.NODE_ENV === 'production' ? {} : err.message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    phase: 2
   });
 });
 
 // =======================
-// SERVER STARTUP
+// SERVER STARTUP - PHASE 2 COMPLETE
 // =======================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📚 Open Skill Nepal Backend - Phase 2 Ready!`);
+  console.log(`📚 Open Skill Nepal Backend - Phase 2 Complete!`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔍 Phase 2 Features Enabled:`);
   console.log(`   ✅ Student Verification Workflow`);
   console.log(`   ✅ Role-based Dashboards`);
   console.log(`   ✅ Video Upload & Live Classes`);
   console.log(`   ✅ School Management`);
+  console.log(`   ✅ Cron Jobs for Video Status`);
+  console.log(`   ✅ Sample Data with Videos`);
   console.log(`📊 Debug endpoints:`);
   console.log(`   - /api/health - System health`);
   console.log(`   - /api/debug/phase2 - Phase 2 status`);
   console.log(`   - /api/debug/mongodb - Database info`);
-  console.log(`\n🎯 Ready for frontend dashboard development!`);
+  console.log(`\n🎯 Phase 2 Backend Ready! Frontend can now integrate with:`);
+  console.log(`   📹 Video upload endpoints`);
+  console.log(`   👥 Student verification flows`);
+  console.log(`   🎓 Role-based dashboard APIs`);
+  console.log(`   ⏰ Live class simulation system`);
 });
