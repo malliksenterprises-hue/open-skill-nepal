@@ -1,10 +1,6 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
-// ❌ WRONG PATH - Change this:
-import { AuthProvider } from '../context/AuthContext'
-
-// ✅ CORRECT PATH - Change to:
-import { AuthProvider } from '../contexts/AuthContext'
+import { AuthProvider } from './contexts/AuthContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
