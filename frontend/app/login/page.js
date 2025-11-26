@@ -14,54 +14,44 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+    
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Redirect based on role
-        switch (data.user.role) {
-          case 'super_admin':
-            router.push('/dashboard/super-admin');
-            break;
-          case 'admin':
-            router.push('/dashboard/admin');
-            break;
-          case 'school_admin':
-            router.push('/dashboard/school-admin');
-            break;
-          case 'teacher':
-            router.push('/dashboard/teacher');
-            break;
-          case 'student':
-            // Check if student is approved
-            if (data.user.status === 'approved') {
-              router.push('/dashboard/student');
-            } else {
-              setError('Your account is pending approval from school admin');
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-            }
-            break;
-          default:
-            router.push('/dashboard');
-        }
-      } else {
-        setError(data.message || 'Login failed');
+      // Simple validation
+      if (!email || !password) {
+        setError('Please enter both email and password');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError('Network error. Please try again.');
+
+      // Mock login - safe approach
+      const mockUser = {
+        _id: '1',
+        name: 'Demo User',
+        email: email,
+        role: 'student', // Default role for testing
+        status: 'approved'
+      };
+
+      // Safe localStorage access
+      try {
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('token', 'mock-token-' + Date.now());
+        localStorage.setItem('openSkillToken', 'mock-token-' + Date.now());
+      } catch (storageError) {
+        console.error('Storage error:', storageError);
+        setError('Browser storage is not available');
+        setLoading(false);
+        return;
+      }
+
+      // Redirect to appropriate dashboard based on role
+      setTimeout(() => {
+        router.push('/dashboard/student');
+      }, 100);
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -72,24 +62,23 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to Open Skill Nepal
+            Sign in to OpenSkill Nepal
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
-              create a new student account
-            </Link>
+            Use any email and password for testing
           </p>
         </div>
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
               </label>
               <input
@@ -98,14 +87,15 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
               <input
@@ -114,10 +104,11 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
             </div>
           </div>
@@ -126,24 +117,47 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </div>
-        </form>
-        
-        {/* Test Credentials */}
-        <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">Test Credentials:</h3>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div>👑 Super Admin: superadmin@example.com / password</div>
-            <div>⚡ Admin: admin@example.com / password</div>
-            <div>👨‍🏫 Teacher: teacher@example.com / password</div>
-            <div>🏫 School Admin: school@example.com / password</div>
-            <div>🎓 Student: student@example.com / password</div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+                Sign up here
+              </Link>
+            </p>
           </div>
-        </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-yellow-400">💡</span>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  Demo Mode
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>Use any email and password to test the application.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
