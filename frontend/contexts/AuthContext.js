@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useContext, useState, useEffect } from 'react'
-// ✅ FIXED: Use proper path alias
-import { authAPI } from '@/utils/api'
+// ✅ FIXED: Use relative path instead of @/ alias
+import { authAPI } from '../../utils/api'
 
 // Create Auth Context
 const AuthContext = createContext()
@@ -46,9 +46,9 @@ export function AuthProvider({ children }) {
    */
   const login = async (email, password) => {
     try {
-      console.log('🔄 AuthContext: Attempting login...') // Add logging
+      console.log('🔄 AuthContext: Attempting login...')
       const response = await authAPI.login(email, password)
-      console.log('✅ AuthContext: Login response:', response) // Add logging
+      console.log('✅ AuthContext: Login response:', response)
       
       const { token: newToken, user: userData } = response
       
@@ -58,9 +58,8 @@ export function AuthProvider({ children }) {
       
       return { success: true, user: userData }
     } catch (error) {
-      console.error('❌ AuthContext: Login error:', error) // Add logging
+      console.error('❌ AuthContext: Login error:', error)
       
-      // FIXED: Correct error property access
       return { 
         success: false, 
         message: error.message || error.data?.message || 'Login failed' 
@@ -87,7 +86,6 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('❌ AuthContext: Google login error:', error)
       
-      // FIXED: Correct error property access
       return { 
         success: false, 
         message: error.message || error.data?.message || 'Google login failed' 
