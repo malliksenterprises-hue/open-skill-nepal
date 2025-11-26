@@ -1,73 +1,70 @@
 'use client';
-import DashboardLayout from '../../../components/DashboardLayout'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
+import DashboardLayout from '../../../components/DashboardLayout';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export default function StudentDashboard() {
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState({
-    enrolledCourses: [],
-    liveClasses: [],
-    stats: {},
-    loading: true
-  });
 
   useEffect(() => {
-    const mockData = {
-      enrolledCourses: [
-        { 
-          id: 1, 
-          name: 'Mathematics', 
-          progress: 75,
-          instructor: 'Dr. Sharma',
-          nextSession: '2024-01-15'
-        },
-        { 
-          id: 2, 
-          name: 'Science', 
-          progress: 50,
-          instructor: 'Dr. Patel',
-          nextSession: '2024-01-16'
-        }
-      ],
-      liveClasses: [
-        {
-          id: 1,
-          subject: 'Mathematics',
-          teacher: 'John Doe',
-          time: '10:00 AM',
-          participants: 32
-        }
-      ],
-      stats: {
-        totalClasses: 12,
-        completed: 8,
-        attendance: '95%'
-      }
-    };
-    
-    setDashboardData({ ...mockData, loading: false });
+    fetchStudentData();
   }, []);
 
-  if (!user) {
+  const fetchStudentData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/student`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardData(data);
+      } else {
+        throw new Error('Failed to fetch student data');
+      }
+    } catch (error) {
+      console.error('Error fetching student data:', error);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Safe data access with fallbacks
+  const classes = dashboardData?.classes || [];
+  const upcomingClasses = dashboardData?.upcomingClasses || [];
+  const recentVideos = dashboardData?.recentVideos || [];
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading student dashboard...</div>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      </DashboardLayout>
     );
   }
 
-  if (dashboardData.loading) {
+  if (error) {
     return (
       <DashboardLayout>
-        <div className="p-6">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-gray-200 h-32 rounded"></div>
-              ))}
-            </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-red-500 text-xl mb-4">⚠️</div>
+            <p className="text-gray-600">{error}</p>
+            <button 
+              onClick={fetchStudentData}
+              className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </DashboardLayout>
@@ -76,73 +73,123 @@ export default function StudentDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Student Dashboard</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="font-semibold text-gray-600">Enrolled Classes</h3>
-            <p className="text-3xl font-bold text-blue-600">
-              {dashboardData.enrolledCourses?.length || 0}
-            </p>
+      <div className="space-y-6">
+        {/* Welcome Card */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Welcome back, {user?.name || 'Student'}!
+          </h1>
+          <p className="text-gray-600">
+            Continue your learning journey with your scheduled classes and videos.
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-blue-100 rounded-lg mr-4">
+                <span className="text-2xl">📚</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Classes</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {dashboardData?.stats?.activeClasses || 0}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="font-semibold text-gray-600">Live Sessions</h3>
-            <p className="text-3xl font-bold text-green-600">
-              {dashboardData.liveClasses?.length || 0}
-            </p>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-lg mr-4">
+                <span className="text-2xl">🎥</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Videos Watched</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {dashboardData?.stats?.videosWatched || 0}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="font-semibold text-gray-600">Completed</h3>
-            <p className="text-3xl font-bold text-purple-600">
-              {dashboardData.stats?.completed || 0}
-            </p>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-100 rounded-lg mr-4">
+                <span className="text-2xl">⏰</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Upcoming</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {upcomingClasses.length}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {dashboardData.enrolledCourses && dashboardData.enrolledCourses.length > 0 ? (
-              dashboardData.enrolledCourses.map(course => (
-                <div key={course.id} className="border rounded-lg p-4">
-                  <h3 className="font-semibold">{course.name || 'Unnamed Course'}</h3>
-                  <p className="text-sm text-gray-600">Instructor: {course.instructor || 'Unknown'}</p>
-                  <div className="mt-2">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
-                        style={{ width: `${course.progress || 0}%` }}
-                      ></div>
+        {/* Upcoming Classes - SAFE MAPPING */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b">
+            <h2 className="text-xl font-semibold">Upcoming Classes</h2>
+          </div>
+          <div className="p-6">
+            {upcomingClasses.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingClasses.map((classItem, index) => (
+                  <div key={classItem?._id || index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{classItem?.title || 'Untitled Class'}</h3>
+                      <p className="text-sm text-gray-600">
+                        Subject: {classItem?.subject || 'Not specified'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Time: {classItem?.scheduleTime ? new Date(classItem.scheduleTime).toLocaleString() : 'Not scheduled'}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{course.progress || 0}% complete</p>
+                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors">
+                      Join Class
+                    </button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
-              <p className="text-gray-500 col-span-2 text-center py-8">No courses enrolled yet</p>
+              <p className="text-gray-500 text-center py-4">No upcoming classes scheduled.</p>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Live Classes</h2>
-          <div className="space-y-3">
-            {dashboardData.liveClasses && dashboardData.liveClasses.length > 0 ? (
-              dashboardData.liveClasses.map(classItem => (
-                <div key={classItem.id} className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <h4 className="font-medium">{classItem.subject || 'Unknown Subject'}</h4>
-                    <p className="text-sm text-gray-600">by {classItem.teacher || 'Unknown Teacher'}</p>
+        {/* Recent Videos - SAFE MAPPING */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b">
+            <h2 className="text-xl font-semibold">Recent Videos</h2>
+          </div>
+          <div className="p-6">
+            {recentVideos.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recentVideos.map((video, index) => (
+                  <div key={video?._id || index} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-100 h-40 flex items-center justify-center">
+                      <span className="text-4xl">🎬</span>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold mb-2">{video?.title || 'Untitled Video'}</h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {video?.teacher?.name || 'Unknown Teacher'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {video?.createdAt ? new Date(video.createdAt).toLocaleDateString() : 'Unknown date'}
+                      </p>
+                      <button className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm transition-colors">
+                        Watch Video
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-green-600 font-semibold">{classItem.time || 'TBA'}</p>
-                    <p className="text-xs text-gray-500">{classItem.participants || 0} participants</p>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">No live classes scheduled</p>
+              <p className="text-gray-500 text-center py-4">No recent videos available.</p>
             )}
           </div>
         </div>
