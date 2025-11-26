@@ -28,4 +28,5 @@ const nextConfig = {
   }
 }
 
+// Force fresh deployment - Remove this comment after build
 module.exports = nextConfig
