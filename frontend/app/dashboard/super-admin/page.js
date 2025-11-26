@@ -1,192 +1,179 @@
 'use client';
-import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 
-export default function SuperAdminDashboard({ activeNav, user }) {
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function SuperAdminDashboard() {
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState({
+    systemStats: {},
+    schools: [],
+    recentActivity: [],
+    adminUsers: [],
+    loading: true
+  });
 
   useEffect(() => {
-    fetchSuperAdminData();
-  }, [activeNav]);
+    const mockData = {
+      systemStats: {
+        totalUsers: 1250,
+        totalSchools: 45,
+        activeCourses: 89,
+        revenue: '₹1,25,000',
+        growthRate: '+12%',
+        activeSessions: 234
+      },
+      schools: [
+        { id: 1, name: 'Kathmandu High School', students: 300, teachers: 15, status: 'Active', district: 'Kathmandu' },
+        { id: 2, name: 'Pokhara Public School', students: 250, teachers: 12, status: 'Active', district: 'Pokhara' },
+        { id: 3, name: 'Biratnagar Academy', students: 180, teachers: 10, status: 'Pending', district: 'Morang' },
+        { id: 4, name: 'Butwal Modern School', students: 220, teachers: 11, status: 'Active', district: 'Rupandehi' }
+      ],
+      adminUsers: [
+        { id: 1, name: 'Admin User 1', email: 'admin1@system.com', role: 'Super Admin', lastActive: '2 hours ago' },
+        { id: 2, name: 'Admin User 2', email: 'admin2@system.com', role: 'System Admin', lastActive: '5 hours ago' }
+      ],
+      recentActivity: [
+        { id: 1, action: 'New school registered', user: 'Kathmandu High School', time: '2 hours ago' },
+        { id: 2, action: 'Course created', user: 'Teacher User', time: '5 hours ago' },
+        { id: 3, action: 'System backup completed', user: 'System', time: '1 day ago' },
+        { id: 4, action: 'User account created', user: 'New Admin', time: '1 day ago' }
+      ]
+    };
+    setDashboardData({ ...mockData, loading: false });
+  }, []);
 
-  const fetchSuperAdminData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/super-admin`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setDashboardData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching super admin data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (!user) {
     return (
-      <DashboardLayout user={user}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading super admin dashboard...</div>
+      </div>
+    );
+  }
+
+  if (dashboardData.loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-gray-200 h-32 rounded"></div>
+              ))}
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     );
   }
 
-  const renderDashboard = () => {
-    switch (activeNav) {
-      case 'dashboard':
-        return (
-          <div className="space-y-6">
-            {/* Welcome Card */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Super Admin Dashboard
-              </h1>
-              <p className="text-gray-600">
-                System-wide overview and platform management.
-              </p>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-blue-100 rounded-lg mr-4">
-                    <span className="text-2xl">🏫</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Schools</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {dashboardData?.stats?.totalSchools || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-green-100 rounded-lg mr-4">
-                    <span className="text-2xl">👥</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Active Schools</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {dashboardData?.stats?.activeSchools || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-purple-100 rounded-lg mr-4">
-                    <span className="text-2xl">⚡</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Admins</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {dashboardData?.stats?.totalAdmins || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-3 bg-red-100 rounded-lg mr-4">
-                    <span className="text-2xl">🔴</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Live Classes</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {dashboardData?.stats?.liveVideos || 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Activities */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Schools */}
-              {dashboardData?.recentActivities?.schools && (
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6 border-b">
-                    <h2 className="text-xl font-semibold">Recent Schools</h2>
-                  </div>
-                  <div className="p-6">
-                    <div className="space-y-3">
-                      {dashboardData.recentActivities.schools.map((school) => (
-                        <div key={school._id} className="flex items-center justify-between py-2">
-                          <div>
-                            <p className="font-medium">{school.name}</p>
-                            <p className="text-sm text-gray-500">{school.code}</p>
-                          </div>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            school.status === 'active' ? 'bg-green-100 text-green-800' :
-                            school.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {school.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Recent Videos */}
-              {dashboardData?.recentActivities?.videos && (
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6 border-b">
-                    <h2 className="text-xl font-semibold">Recent Videos</h2>
-                  </div>
-                  <div className="p-6">
-                    <div className="space-y-3">
-                      {dashboardData.recentActivities.videos.map((video) => (
-                        <div key={video._id} className="py-2 border-b border-gray-100 last:border-b-0">
-                          <p className="font-medium text-sm">{video.title}</p>
-                          <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                            <span>By {video.teacher?.name}</span>
-                            <span className={`px-2 py-1 rounded-full ${
-                              video.status === 'live' ? 'bg-red-100 text-red-800' :
-                              video.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {video.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Super Admin Dashboard</h2>
-            <p>System-wide management and monitoring.</p>
-          </div>
-        );
-    }
-  };
-
   return (
-    <DashboardLayout user={user}>
-      {renderDashboard()}
+    <DashboardLayout>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Super Admin Dashboard</h1>
+        
+        {/* System Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="font-semibold text-gray-600">Total Users</h3>
+            <p className="text-3xl font-bold text-blue-600">
+              {dashboardData.systemStats?.totalUsers || 0}
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="font-semibold text-gray-600">Total Schools</h3>
+            <p className="text-3xl font-bold text-green-600">
+              {dashboardData.systemStats?.totalSchools || 0}
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="font-semibold text-gray-600">Active Courses</h3>
+            <p className="text-3xl font-bold text-purple-600">
+              {dashboardData.systemStats?.activeCourses || 0}
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="font-semibold text-gray-600">Revenue</h3>
+            <p className="text-3xl font-bold text-orange-600">
+              {dashboardData.systemStats?.revenue || '₹0'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Schools List */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Registered Schools</h2>
+              <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+                {dashboardData.schools?.length || 0} schools
+              </span>
+            </div>
+            <div className="space-y-3">
+              {dashboardData.schools?.map(school => (
+                <div key={school.id} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold">{school.name}</h3>
+                      <p className="text-sm text-gray-600">{school.district}</p>
+                      <div className="flex space-x-4 mt-2">
+                        <span className="text-xs text-gray-500">{school.students || 0} students</span>
+                        <span className="text-xs text-gray-500">{school.teachers || 0} teachers</span>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      school.status === 'Active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {school.status}
+                    </span>
+                  </div>
+                </div>
+              )) || <p className="text-gray-500 text-center py-4">No schools registered</p>}
+            </div>
+          </div>
+
+          {/* Admin Users */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Admin Users</h2>
+            <div className="space-y-3">
+              {dashboardData.adminUsers?.map(admin => (
+                <div key={admin.id} className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="font-medium">{admin.name}</h3>
+                    <p className="text-sm text-gray-600">{admin.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">{admin.role}</p>
+                    <p className="text-xs text-gray-500">Active: {admin.lastActive}</p>
+                  </div>
+                </div>
+              )) || <p className="text-gray-500 text-center py-4">No admin users</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-white rounded-lg shadow p-6 mt-6">
+          <h2 className="text-xl font-semibold mb-4">System Activity</h2>
+          <div className="space-y-3">
+            {dashboardData.recentActivity?.map(activity => (
+              <div key={activity.id} className="flex items-center border-b pb-3">
+                <div className="bg-purple-100 p-2 rounded-lg mr-4">
+                  <span className="text-purple-600">⚡</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{activity.action}</p>
+                  <p className="text-sm text-gray-600">by {activity.user}</p>
+                </div>
+                <span className="text-sm text-gray-500">{activity.time}</span>
+              </div>
+            )) || <p className="text-gray-500 text-center py-4">No recent activity</p>}
+          </div>
+        </div>
+      </div>
     </DashboardLayout>
   );
 }
