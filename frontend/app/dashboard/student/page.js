@@ -15,7 +15,7 @@ export default function StudentDashboard() {
 
   const fetchStudentData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('openSkillToken');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/student`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -23,24 +23,28 @@ export default function StudentDashboard() {
         },
       });
       
+      console.log('Dashboard response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Dashboard data received:', data);
         setDashboardData(data);
       } else {
-        throw new Error('Failed to fetch student data');
+        throw new Error(`Failed to fetch student data: ${response.status}`);
       }
     } catch (error) {
       console.error('Error fetching student data:', error);
-      setError('Failed to load dashboard data');
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Safe data access with fallbacks
+  // SAFE DATA ACCESS WITH FALLBACKS
   const classes = dashboardData?.classes || [];
   const upcomingClasses = dashboardData?.upcomingClasses || [];
   const recentVideos = dashboardData?.recentVideos || [];
+  const stats = dashboardData?.stats || {};
 
   if (loading) {
     return (
@@ -58,12 +62,13 @@ export default function StudentDashboard() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="text-red-500 text-xl mb-4">⚠️</div>
-            <p className="text-gray-600">{error}</p>
+            <p className="text-gray-600 mb-2">Failed to load dashboard</p>
+            <p className="text-sm text-gray-500 mb-4">{error}</p>
             <button 
               onClick={fetchStudentData}
-              className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+              className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
             >
-              Retry
+              Try Again
             </button>
           </div>
         </div>
@@ -94,7 +99,7 @@ export default function StudentDashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Classes</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.stats?.activeClasses || 0}
+                  {stats.activeClasses || 0}
                 </p>
               </div>
             </div>
@@ -108,7 +113,7 @@ export default function StudentDashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Videos Watched</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.stats?.videosWatched || 0}
+                  {stats.videosWatched || 0}
                 </p>
               </div>
             </div>
@@ -138,7 +143,7 @@ export default function StudentDashboard() {
             {upcomingClasses.length > 0 ? (
               <div className="space-y-4">
                 {upcomingClasses.map((classItem, index) => (
-                  <div key={classItem?._id || index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                  <div key={classItem?._id || `class-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{classItem?.title || 'Untitled Class'}</h3>
                       <p className="text-sm text-gray-600">
@@ -169,7 +174,7 @@ export default function StudentDashboard() {
             {recentVideos.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {recentVideos.map((video, index) => (
-                  <div key={video?._id || index} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div key={video?._id || `video-${index}`} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="bg-gray-100 h-40 flex items-center justify-center">
                       <span className="text-4xl">🎬</span>
                     </div>
