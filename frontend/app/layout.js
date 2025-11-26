@@ -1,22 +1,19 @@
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { AuthProvider } from '../contexts/AuthContext'
-
-const inter = Inter({ subsets: ['latin'] })
+import { AuthProvider } from '../contexts/AuthContext';
+import './globals.css';
 
 export const metadata = {
-  title: 'Open Skill Nepal - EdTech Platform',
-  description: 'Empowering education through technology in Nepal',
-}
+  title: 'Open Skill Nepal',
+  description: 'Empowering education through technology',
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <AuthProvider>
           {children}
         </AuthProvider>
       </body>
     </html>
-  )
+  );
 }
