@@ -1,10 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
+import DashboardLayout from '../../../components/DashboardLayout';
+import { useAuth } from '../../../contexts/AuthContext';
 
-export default function AdminDashboard({ activeNav, user }) {
+export default function AdminDashboard({ activeNav }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchAdminData();
@@ -31,7 +33,7 @@ export default function AdminDashboard({ activeNav, user }) {
 
   if (loading) {
     return (
-      <DashboardLayout user={user}>
+      <DashboardLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
@@ -188,7 +190,7 @@ export default function AdminDashboard({ activeNav, user }) {
   };
 
   return (
-    <DashboardLayout user={user}>
+    <DashboardLayout>
       {renderDashboard()}
     </DashboardLayout>
   );
