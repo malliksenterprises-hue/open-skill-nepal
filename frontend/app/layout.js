@@ -1,6 +1,10 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
+// ❌ WRONG PATH - Change this:
 import { AuthProvider } from '../context/AuthContext'
+
+// ✅ CORRECT PATH - Change to:
+import { AuthProvider } from '../contexts/AuthContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -9,10 +13,6 @@ export const metadata = {
   description: 'Empowering education through technology in Nepal',
 }
 
-/**
- * Root layout component that wraps the entire application
- * Provides AuthContext to all child components
- */
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
