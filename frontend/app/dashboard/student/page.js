@@ -1,7 +1,7 @@
 'use client';
-import DashboardLayout from '@/components/DashboardLayout';
-import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
+import DashboardLayout from '../../../components/DashboardLayout'
+import { useAuth } from '../../../contexts/AuthContext'
+import { useState, useEffect } from 'react'
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -12,9 +12,7 @@ export default function StudentDashboard() {
     loading: true
   });
 
-  // Safe data initialization
   useEffect(() => {
-    // Mock data for testing
     const mockData = {
       enrolledCourses: [
         { 
@@ -81,7 +79,6 @@ export default function StudentDashboard() {
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Student Dashboard</h1>
         
-        {/* Stats Cards - SAFE RENDERING */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="font-semibold text-gray-600">Enrolled Classes</h3>
@@ -103,7 +100,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Enrolled Courses - SAFE RENDERING */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -129,7 +125,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Live Classes - SAFE RENDERING */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Live Classes</h2>
           <div className="space-y-3">
