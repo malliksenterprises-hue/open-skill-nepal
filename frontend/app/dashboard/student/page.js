@@ -8,9 +8,9 @@ export default function StudentDashboard() {
   const [dashboardData, setDashboardData] = useState({
     enrolledCourses: [],
     liveClasses: [],
-    stats: {}
+    stats: {},
+    loading: true
   });
-  const [loading, setLoading] = useState(true);
 
   // Safe data initialization
   useEffect(() => {
@@ -48,8 +48,7 @@ export default function StudentDashboard() {
       }
     };
     
-    setDashboardData(mockData);
-    setLoading(false);
+    setDashboardData({ ...mockData, loading: false });
   }, []);
 
   if (!user) {
@@ -60,7 +59,7 @@ export default function StudentDashboard() {
     );
   }
 
-  if (loading) {
+  if (dashboardData.loading) {
     return (
       <DashboardLayout>
         <div className="p-6">
@@ -82,7 +81,7 @@ export default function StudentDashboard() {
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Student Dashboard</h1>
         
-        {/* Stats Cards */}
+        {/* Stats Cards - SAFE RENDERING */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="font-semibold text-gray-600">Enrolled Classes</h3>
@@ -108,21 +107,25 @@ export default function StudentDashboard() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {dashboardData.enrolledCourses?.map(course => (
-              <div key={course.id} className="border rounded-lg p-4">
-                <h3 className="font-semibold">{course.name}</h3>
-                <p className="text-sm text-gray-600">Instructor: {course.instructor}</p>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${course.progress}%` }}
-                    ></div>
+            {dashboardData.enrolledCourses && dashboardData.enrolledCourses.length > 0 ? (
+              dashboardData.enrolledCourses.map(course => (
+                <div key={course.id} className="border rounded-lg p-4">
+                  <h3 className="font-semibold">{course.name || 'Unnamed Course'}</h3>
+                  <p className="text-sm text-gray-600">Instructor: {course.instructor || 'Unknown'}</p>
+                  <div className="mt-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${course.progress || 0}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{course.progress || 0}% complete</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{course.progress}% complete</p>
                 </div>
-              </div>
-            )) || <p>No courses enrolled</p>}
+              ))
+            ) : (
+              <p className="text-gray-500 col-span-2 text-center py-8">No courses enrolled yet</p>
+            )}
           </div>
         </div>
 
@@ -130,18 +133,22 @@ export default function StudentDashboard() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Live Classes</h2>
           <div className="space-y-3">
-            {dashboardData.liveClasses?.map(classItem => (
-              <div key={classItem.id} className="flex items-center justify-between border-b pb-3">
-                <div>
-                  <h4 className="font-medium">{classItem.subject}</h4>
-                  <p className="text-sm text-gray-600">by {classItem.teacher}</p>
+            {dashboardData.liveClasses && dashboardData.liveClasses.length > 0 ? (
+              dashboardData.liveClasses.map(classItem => (
+                <div key={classItem.id} className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <h4 className="font-medium">{classItem.subject || 'Unknown Subject'}</h4>
+                    <p className="text-sm text-gray-600">by {classItem.teacher || 'Unknown Teacher'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-green-600 font-semibold">{classItem.time || 'TBA'}</p>
+                    <p className="text-xs text-gray-500">{classItem.participants || 0} participants</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-green-600 font-semibold">{classItem.time}</p>
-                  <p className="text-xs text-gray-500">{classItem.participants} participants</p>
-                </div>
-              </div>
-            )) || <p>No live classes scheduled</p>}
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No live classes scheduled</p>
+            )}
           </div>
         </div>
       </div>
