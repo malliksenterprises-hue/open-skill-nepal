@@ -4,18 +4,21 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function StudentDashboard() {
-  const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardData, setDashboardData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
+    console.log('✅ STUDENT DASHBOARD - FIXED VERSION LOADED');
     fetchStudentData();
   }, []);
 
   const fetchStudentData = async () => {
     try {
       const token = localStorage.getItem('openSkillToken');
+      console.log('🔄 Fetching student data with token:', !!token);
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/student`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -23,27 +26,28 @@ export default function StudentDashboard() {
         },
       });
       
-      console.log('Dashboard response status:', response.status);
+      console.log('📊 API Response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Dashboard data received:', data);
-        setDashboardData(data);
+        console.log('📦 Received dashboard data:', data);
+        setDashboardData(data || {});
       } else {
-        throw new Error(`Failed to fetch student data: ${response.status}`);
+        throw new Error(`API Error: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error fetching student data:', error);
+      console.error('❌ Error fetching student data:', error);
       setError(error.message);
+      setDashboardData({});
     } finally {
       setLoading(false);
     }
   };
 
-  // SAFE DATA ACCESS WITH FALLBACKS
-  const classes = dashboardData?.classes || [];
-  const upcomingClasses = dashboardData?.upcomingClasses || [];
-  const recentVideos = dashboardData?.recentVideos || [];
+  // SAFE DATA ACCESS - PREVENTS .map() ERRORS
+  const classes = Array.isArray(dashboardData?.classes) ? dashboardData.classes : [];
+  const upcomingClasses = Array.isArray(dashboardData?.upcomingClasses) ? dashboardData.upcomingClasses : [];
+  const recentVideos = Array.isArray(dashboardData?.recentVideos) ? dashboardData.recentVideos : [];
   const stats = dashboardData?.stats || {};
 
   if (loading) {
@@ -134,7 +138,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Upcoming Classes - SAFE MAPPING */}
+        {/* Upcoming Classes - 100% SAFE MAPPING */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b">
             <h2 className="text-xl font-semibold">Upcoming Classes</h2>
@@ -165,7 +169,7 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Recent Videos - SAFE MAPPING */}
+        {/* Recent Videos - 100% SAFE MAPPING */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b">
             <h2 className="text-xl font-semibold">Recent Videos</h2>
