@@ -134,9 +134,9 @@ async function connectDB() {
 // =======================
 async function initializePhase2SampleData() {
   try {
-    const User = require('../models/User');
-    const School = require('../models/School');
-    const Video = require('../models/Video');
+    const User = require('./models/User');
+    const School = require('./models/School');
+    const Video = require('./models/Video');
     
     const userCount = await User.countDocuments();
     const schoolCount = await School.countDocuments();
@@ -182,9 +182,9 @@ function initializeCronJobs() {
 
 async function createPhase2SampleData() {
   try {
-    const User = require('../models/User');
-    const School = require('../models/School');
-    const Video = require('../models/Video');
+    const User = require('./models/User');
+    const School = require('./models/School');
+    const Video = require('./models/Video');
     
     // Create sample schools first
     const schools = [
@@ -417,13 +417,13 @@ async function createPhase2SampleData() {
 connectDB();
 
 // =======================
-// ROUTE IMPORTS - PHASE 2 COMPLETE
+// ROUTE IMPORTS - CORRECTED PATHS
 // =======================
-const authRoutes = require('../routes/authRoutes');
-const dashboardRoutes = require('../routes/dashboardRoutes');
-const studentRoutes = require('../routes/studentRoutes');
-const videoRoutes = require('../routes/videoRoutes');
-const schoolRoutes = require('../routes/schoolRoutes');
+const authRoutes = require('./routes/authRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const videoRoutes = require('./routes/videoRoutes');
+const schoolRoutes = require('./routes/schoolRoutes');
 
 // =======================
 // ROUTE MOUNTING - PHASE 2 COMPLETE
@@ -490,9 +490,9 @@ app.get('/api/health', async (req, res) => {
 // Enhanced debug endpoint for Phase 2
 app.get('/api/debug/phase2', async (req, res) => {
   try {
-    const User = require('../models/User');
-    const School = require('../models/School');
-    const Video = require('../models/Video');
+    const User = require('./models/User');
+    const School = require('./models/School');
+    const Video = require('./models/Video');
     
     const [userCount, schoolCount, videoCount] = await Promise.all([
       User.countDocuments(),
@@ -585,9 +585,9 @@ app.get('/api/debug/mongodb', async (req, res) => {
         debugInfo.ping = pingResult;
         
         // Test collections
-        const User = require('../models/User');
-        const School = require('../models/School');
-        const Video = require('../models/Video');
+        const User = require('./models/User');
+        const School = require('./models/School');
+        const Video = require('./models/Video');
         
         debugInfo.collections = {
           users: await User.countDocuments(),
