@@ -1,217 +1,151 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { auth } = require('../middleware/authMiddleware');
+const User = require('../models/User');
 const router = express.Router();
 
-// User login
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const User = require('../models/User');
 
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({ 
-        message: 'Email and password are required',
-        code: 'MISSING_CREDENTIALS'
-      });
-    }
-
-    // Find user by email
-    const user = await User.findByEmail(email);
+    // Find user
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(401).json({ 
-        message: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS'
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 
     // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        message: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS'
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 
-    // Check if user can login (student verification)
-    if (!user.canLogin()) {
-      return res.status(403).json({ 
-        message: 'Account pending approval from school admin',
-        status: user.status,
-        code: 'PENDING_APPROVAL'
-      });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    user.loginCount += 1;
-    await user.save();
-
-    // Generate JWT token
+    // Generate token
     const token = jwt.sign(
-      { 
-        userId: user._id,
-        email: user.email,
-        role: user.role 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '24h' }
     );
 
-    // Prepare user data for response
-    const userData = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      school: user.school,
-      profile: user.profile,
-      isActive: user.isActive,
-      lastLogin: user.lastLogin
-    };
-
     res.json({
-      message: 'Login successful',
+      success: true,
       token,
-      user: userData,
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ 
-      message: 'Login failed',
-      error: error.message,
-      code: 'LOGIN_ERROR'
-    });
-  }
-});
-
-// Get current user profile
-router.get('/profile', auth, async (req, res) => {
-  try {
-    const user = await require('../models/User').findById(req.user._id)
-      .select('-password')
-      .populate('school', 'name code');
-
-    res.json({
-      user,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Get Profile Error:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch profile',
-      error: error.message 
-    });
-  }
-});
-
-// Update user profile
-router.put('/profile', auth, async (req, res) => {
-  try {
-    const { name, phone, address, bio } = req.body;
-    const User = require('../models/User');
-
-    const user = await User.findById(req.user._id);
-    
-    if (name) user.name = name;
-    if (phone) user.profile.phone = phone;
-    if (address) user.profile.address = address;
-    if (bio) user.profile.bio = bio;
-
-    await user.save();
-
-    res.json({
-      message: 'Profile updated successfully',
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        profile: user.profile
-      },
-      timestamp: new Date().toISOString()
+        role: user.role,
+        school: user.school
+      }
     });
+
   } catch (error) {
-    console.error('Update Profile Error:', error);
-    res.status(500).json({ 
-      message: 'Failed to update profile',
-      error: error.message 
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login'
     });
   }
 });
 
-// Change password
-router.put('/change-password', auth, async (req, res) => {
+// POST /api/auth/signup
+router.post('/signup', async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    const User = require('../models/User');
+    const { name, email, password, role, school } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        message: 'Current password and new password are required' 
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists'
       });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        message: 'New password must be at least 6 characters long' 
-      });
-    }
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await User.findById(req.user._id);
-    
-    // Verify current password
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({ 
-        message: 'Current password is incorrect' 
-      });
-    }
+    // Create user
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      school,
+      status: role === 'student' ? 'pending' : 'approved',
+      isActive: role !== 'student'
+    });
 
-    // Update password
-    user.password = newPassword;
     await user.save();
 
-    res.json({
-      message: 'Password changed successfully',
-      timestamp: new Date().toISOString()
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
+
   } catch (error) {
-    console.error('Change Password Error:', error);
-    res.status(500).json({ 
-      message: 'Failed to change password',
-      error: error.message 
+    console.error('Signup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during signup'
     });
   }
 });
 
-// Verify token endpoint (for frontend token validation)
-router.get('/verify', auth, (req, res) => {
-  res.json({
-    valid: true,
-    user: {
-      id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-      status: req.user.status,
-      school: req.user.school
-    },
-    timestamp: new Date().toISOString()
-  });
-});
+// GET /api/auth/me
+router.get('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
 
-// Logout (client-side token removal)
-router.post('/logout', auth, (req, res) => {
-  res.json({
-    message: 'Logout successful',
-    timestamp: new Date().toISOString()
-  });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const user = await User.findById(decoded.userId).populate('school');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        school: user.school,
+        status: user.status
+      }
+    });
+
+  } catch (error) {
+    console.error('Auth me error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
 });
 
 module.exports = router;
