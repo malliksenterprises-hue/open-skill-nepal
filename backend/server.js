@@ -5,9 +5,8 @@ const PORT = process.env.PORT || 8080;
 // Basic middleware
 app.use(express.json());
 
-// ✅ ROOT ENDPOINT - Critical for Cloud Run
+// Root endpoint
 app.get('/', (req, res) => {
-  console.log('✅ Root endpoint hit');
   res.json({
     message: '🚀 Open Skill Nepal Backend - DEPLOYED & WORKING',
     status: 'operational',
@@ -17,9 +16,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// ✅ HEALTH CHECK - Critical for Cloud Run
+// Health check
 app.get('/health', (req, res) => {
-  console.log('✅ Health check hit');
   res.status(200).json({
     status: 'healthy',
     service: 'Open Skill Nepal Backend',
@@ -29,13 +27,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ✅ GOOGLE CLOUD RUN HEALTH CHECK
+// Google Cloud Run health check
 app.get('/_ah/health', (req, res) => {
-  console.log('✅ Google health check hit');
   res.status(200).json({ status: 'healthy' });
 });
 
-// ✅ API HEALTH CHECK
+// Simple API routes (no external dependencies)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -44,7 +41,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ✅ DEBUG ENDPOINT
 app.get('/api/debug/phase2', (req, res) => {
   res.json({
     phase: 2,
@@ -55,43 +51,9 @@ app.get('/api/debug/phase2', (req, res) => {
   });
 });
 
-// ✅ 404 HANDLER
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl,
-    availableRoutes: [
-      'GET /',
-      'GET /health',
-      'GET /_ah/health',
-      'GET /api/health',
-      'GET /api/debug/phase2'
-    ],
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ✅ START SERVER WITH VERBOSE LOGGING
-console.log('='.repeat(50));
-console.log('🚀 STARTING OPEN SKILL NEPAL BACKEND');
-console.log('='.repeat(50));
-console.log('📍 Port:', PORT);
-console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
-console.log('⏰ Starting at:', new Date().toISOString());
-
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log('='.repeat(50));
-  console.log('✅ SERVER SUCCESSFULLY STARTED!');
-  console.log('✅ Ready for Cloud Run deployment');
-  console.log('📍 Local test: http://localhost:' + PORT + '/health');
-  console.log('='.repeat(50));
-});
-
-// ✅ GRACEFUL SHUTDOWN
-process.on('SIGTERM', () => {
-  console.log('🔄 SIGTERM received - Shutting down gracefully');
-  server.close(() => {
-    console.log('✅ Server terminated');
-    process.exit(0);
-  });
+// Start server
+console.log('🚀 Starting Open Skill Nepal Backend...');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('✅ Server successfully started on port:', PORT);
+  console.log('✅ Ready for Cloud Run!');
 });
