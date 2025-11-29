@@ -119,18 +119,32 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
-// Mount API routes
+// Mount API routes with better error handling
+console.log('🔄 Loading API routes...');
 try {
   const apiRoutes = require('./routes');
   app.use('/api', apiRoutes);
   console.log('✅ API routes mounted successfully');
-} catch (error) {
-  console.warn('⚠️ API routes not loaded:', error.message);
-  app.use('/api', (req, res) => {
+  
+  // Test if routes are actually working
+  app.get('/api/test-routes', (req, res) => {
     res.json({
-      message: 'API routes loading...',
-      status: 'initializing',
-      timestamp: new Date().toISOString()
+      message: 'API routes are working!',
+      timestamp: new Date().toISOString(),
+      routesLoaded: true
+    });
+  });
+} catch (error) {
+  console.error('❌ API routes loading failed:', error.message);
+  console.error('Error stack:', error.stack);
+  
+  // Provide detailed fallback
+  app.use('/api', (req, res) => {
+    res.status(503).json({
+      error: 'API routes initialization failed',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+      status: 'initializing'
     });
   });
 }
