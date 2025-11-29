@@ -122,7 +122,7 @@ app.get('/api/metrics', (req, res) => {
 // Mount API routes with better error handling
 console.log('🔄 Loading API routes...');
 try {
-  // ✅ FIX: Import from routes/index.js instead of ./routes
+  // ✅ FIX: Import from routes/index.js which now combines all routes
   const apiRoutes = require('./routes/index');
   app.use('/api', apiRoutes);
   console.log('✅ API routes mounted successfully');
@@ -132,7 +132,14 @@ try {
     res.json({
       message: 'API routes are working!',
       timestamp: new Date().toISOString(),
-      routesLoaded: true
+      routesLoaded: true,
+      availableRoutes: [
+        '/api/auth',
+        '/api/students', 
+        '/api/videos',
+        '/api/schools',
+        '/api/dashboard'
+      ]
     });
   });
 } catch (error) {
