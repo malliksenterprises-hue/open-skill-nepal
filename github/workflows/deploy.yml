@@ -29,5 +29,5 @@ jobs:
       with:
         service: ${{ env.SERVICE }}
         region: ${{ env.REGION }}
-        source: ./backend
-        flags: "--allow-unauthenticated --port=8080 --set-env-vars=NODE_ENV=production"
+        source: ./
+        flags: "--allow-unauthenticated --port=8080 --set-env-vars=NODE_ENV=production --memory=1Gi --cpu=1"
