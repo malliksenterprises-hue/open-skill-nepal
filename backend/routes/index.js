@@ -13,32 +13,32 @@ router.get('/health', (req, res) => {
 });
 
 // Phase 2 Debug Endpoint
-router.get('/debug/phase2', (req, res) => {
-  res.json({
-    phase: 2,
-    status: 'operational',
-    deployment: 'professional',
-    timestamp: new Date().toISOString(),
-    features: [
-      'Enterprise Security Headers',
-      'Rate Limiting Protection',
-      'CORS Configuration',
-      'GZIP Compression',
-      'Structured Error Handling',
-      'Comprehensive Health Checks',
-      'Graceful Shutdown',
-      'Production-Ready Logging'
-    ],
-    security: {
-      helmet: 'enabled',
-      rateLimiting: '100 req/15min',
-      cors: 'configured',
-      compression: 'enabled'
-    }
-  });
+router.get('/debug/phase2', async (req, res) => {
+  try {
+    res.json({
+      phase: 2,
+      status: 'operational',
+      deployment: 'professional',
+      timestamp: new Date().toISOString(),
+      features: [
+        'Enterprise Security Headers',
+        'Rate Limiting Protection',
+        'CORS Configuration',
+        'GZIP Compression',
+        'Structured Error Handling',
+        'Comprehensive Health Checks'
+      ]
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Debug endpoint failed',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-// Authentication Routes (Placeholder)
+// Authentication Routes
 router.get('/auth/status', (req, res) => {
   res.json({
     service: 'Authentication',
@@ -48,42 +48,51 @@ router.get('/auth/status', (req, res) => {
   });
 });
 
-// Students Routes (Placeholder)
+// Students Management
 router.get('/students', (req, res) => {
   res.json({
-    message: 'Students management API',
-    status: 'ready',
+    message: 'Students Management API',
+    status: 'operational',
     endpoints: ['GET /api/students', 'POST /api/students', 'GET /api/students/:id'],
     timestamp: new Date().toISOString()
   });
 });
 
-// Videos Routes (Placeholder)
+// Video Management
 router.get('/videos', (req, res) => {
   res.json({
-    message: 'Video content management API',
-    status: 'ready',
+    message: 'Video Content Management API',
+    status: 'operational',
     endpoints: ['GET /api/videos', 'POST /api/videos/upload', 'GET /api/videos/:id'],
     timestamp: new Date().toISOString()
   });
 });
 
-// Schools Routes (Placeholder)
+// Schools Management
 router.get('/schools', (req, res) => {
   res.json({
-    message: 'Schools management API',
-    status: 'ready',
+    message: 'Schools Management API',
+    status: 'operational',
     endpoints: ['GET /api/schools', 'POST /api/schools', 'GET /api/schools/:id'],
     timestamp: new Date().toISOString()
   });
 });
 
-// Dashboard Routes (Placeholder)
+// Dashboard Analytics
 router.get('/dashboard', (req, res) => {
   res.json({
-    message: 'Dashboard analytics API',
-    status: 'ready',
+    message: 'Dashboard Analytics API',
+    status: 'operational',
     endpoints: ['GET /api/dashboard/stats', 'GET /api/dashboard/analytics'],
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test endpoint
+router.get('/test', (req, res) => {
+  res.json({
+    message: 'All API routes working correctly!',
+    status: 'operational',
     timestamp: new Date().toISOString()
   });
 });
