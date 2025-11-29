@@ -122,7 +122,8 @@ app.get('/api/metrics', (req, res) => {
 // Mount API routes with better error handling
 console.log('🔄 Loading API routes...');
 try {
-  const apiRoutes = require('./routes');
+  // ✅ FIX: Import from routes/index.js instead of ./routes
+  const apiRoutes = require('./routes/index');
   app.use('/api', apiRoutes);
   console.log('✅ API routes mounted successfully');
   
