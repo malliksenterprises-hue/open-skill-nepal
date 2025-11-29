@@ -1,5 +1,3 @@
-# Create the professional server file
-cat > server.js << 'EOF'
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,14 +5,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-// Initialize Express app
 const app = express();
 
-// ======================
-// SECURITY MIDDLEWARE
-// ======================
-
-// Helmet security headers
+// Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -29,7 +22,6 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration
 app.use(cors({
   origin: [
     'https://openskillnepal.com',
@@ -41,7 +33,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -54,18 +45,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Compression middleware
 app.use(compression());
-
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ======================
-// HEALTH CHECKS
-// ======================
-
-// Root endpoint
+// Health checks
 app.get('/', (req, res) => {
   res.status(200).json({
     message: '🚀 Open Skill Nepal Backend API',
@@ -77,7 +61,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   const healthCheck = {
     status: 'healthy',
@@ -90,7 +73,6 @@ app.get('/health', (req, res) => {
   res.status(200).json(healthCheck);
 });
 
-// Google Cloud Run health check
 app.get('/_ah/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy',
@@ -98,41 +80,36 @@ app.get('/_ah/health', (req, res) => {
   });
 });
 
-// API documentation endpoint
+// API documentation
 app.get('/api/docs', (req, res) => {
   res.json({
-    name: 'Open Skill Nepal API',
+    name: 'Open Skill Nepal API - Professional Grade',
     version: '2.0.0',
+    status: 'operational',
+    timestamp: new Date().toISOString(),
     endpoints: {
-      auth: {
-        login: 'POST /api/auth/login',
-        register: 'POST /api/auth/register',
-        profile: 'GET /api/auth/me'
-      },
-      students: {
-        list: 'GET /api/students',
-        create: 'POST /api/students',
-        get: 'GET /api/students/:id'
-      },
-      videos: {
-        list: 'GET /api/videos',
-        upload: 'POST /api/videos/upload',
-        get: 'GET /api/videos/:id'
-      },
-      schools: {
-        list: 'GET /api/schools',
-        create: 'POST /api/schools',
-        get: 'GET /api/schools/:id'
-      },
-      system: {
-        health: 'GET /health',
-        metrics: 'GET /api/metrics'
-      }
-    }
+      root: 'GET /',
+      health: 'GET /health',
+      api_health: 'GET /api/health',
+      api_debug: 'GET /api/debug/phase2',
+      api_students: 'GET /api/students',
+      api_videos: 'GET /api/videos',
+      api_schools: 'GET /api/schools',
+      api_auth: 'GET /api/auth/status',
+      api_dashboard: 'GET /api/dashboard'
+    },
+    features: [
+      'Enterprise Security Headers',
+      'Rate Limiting (100 req/15min)',
+      'CORS Configuration',
+      'GZIP Compression',
+      'Structured Error Handling',
+      'Comprehensive Health Checks',
+      'Graceful Shutdown'
+    ]
   });
 });
 
-// API metrics endpoint
 app.get('/api/metrics', (req, res) => {
   res.json({
     timestamp: new Date().toISOString(),
@@ -142,7 +119,7 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
-// Mount API routes with error handling
+// Mount API routes
 try {
   const apiRoutes = require('./routes');
   app.use('/api', apiRoutes);
@@ -158,11 +135,7 @@ try {
   });
 }
 
-// ======================
-// ERROR HANDLING
-// ======================
-
-// 404 handler
+// Error handling
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
@@ -177,7 +150,6 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global error handler
 app.use((error, req, res, next) => {
   console.error('🚨 Server Error:', error);
   const errorResponse = {
@@ -188,12 +160,7 @@ app.use((error, req, res, next) => {
   res.status(500).json(errorResponse);
 });
 
-// ======================
-// SERVER STARTUP
-// ======================
-
 const PORT = process.env.PORT || 8080;
-
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(60));
   console.log('🚀 OPEN SKILL NEPAL BACKEND - PROFESSIONAL GRADE');
@@ -208,7 +175,6 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('✅ Server ready for production deployment');
 });
 
-// Graceful shutdown
 const gracefulShutdown = (signal) => {
   console.log(`\n🔄 ${signal} received, starting graceful shutdown...`);
   server.close(() => {
@@ -225,4 +191,3 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = app;
-EOF
