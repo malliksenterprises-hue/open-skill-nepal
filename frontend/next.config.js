@@ -1,32 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  trailingSlash: true,
-  images: {
-    unoptimized: true
+  experimental: {
+    appDir: true,
   },
-  // REMOVE experimental.appDir - It's now default in Next.js 14
-  // Enable CORS for your backend
-  async headers() {
+  images: {
+    domains: ['localhost', 'open-skill-nepal-669869115660.asia-south1.run.app'],
+  },
+  env: {
+    BACKEND_URL: process.env.BACKEND_URL || 'https://open-skill-nepal-669869115660.asia-south1.run.app',
+  },
+  async rewrites() {
     return [
       {
         source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: 'https://open-skill-nepal-669869115660.asia-south1.run.app' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PUT,DELETE,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
+        destination: `${process.env.BACKEND_URL || 'https://open-skill-nepal-669869115660.asia-south1.run.app'}/api/:path*`,
       },
-    ]
-  },
-  // Add webpack config for path aliases
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': require('path').resolve(__dirname),
-    }
-    return config
+    ];
   }
 }
 
-// Force fresh deployment - Remove this comment after build
 module.exports = nextConfig
