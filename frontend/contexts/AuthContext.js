@@ -1,139 +1,80 @@
-'use client'
-import { createContext, useContext, useState, useEffect } from 'react'
-// ✅ FIXED: Use relative path instead of @/ alias
-import { authAPI } from '../../utils/api'
+'use client';
+import { createContext, useState, useContext, useEffect } from 'react';
+import api from '@/utils/api';
 
-// Create Auth Context
-const AuthContext = createContext()
+const AuthContext = createContext();
 
-/**
- * AuthProvider component that manages authentication state
- * Provides user, login, logout functions to all components
- */
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [token, setToken] = useState(null)
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
-  // Check if user is logged in on component mount
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    checkAuth()
-  }, [])
+    checkAuth();
+  }, []);
 
-  /**
-   * Check if user has valid token and get user data
-   */
   const checkAuth = async () => {
     try {
-      const storedToken = localStorage.getItem('openSkillToken')
-      if (storedToken) {
-        setToken(storedToken)
-        const userData = await authAPI.getMe(storedToken)
-        setUser(userData)
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const response = await api.get('/api/auth/me');
+          setUser(response.data.user);
+        }
       }
     } catch (error) {
-      console.error('Auth check failed:', error)
-      localStorage.removeItem('openSkillToken')
-      setToken(null)
-      setUser(null)
+      console.error('Auth check failed:', error);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  /**
-   * Login user and store token
-   */
   const login = async (email, password) => {
     try {
-      console.log('🔄 AuthContext: Attempting login...')
-      const response = await authAPI.login(email, password)
-      console.log('✅ AuthContext: Login response:', response)
+      const response = await api.post('/api/auth/login', { email, password });
+      const { token, user } = response.data;
       
-      const { token: newToken, user: userData } = response
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
+      setUser(user);
       
-      localStorage.setItem('openSkillToken', newToken)
-      setToken(newToken)
-      setUser(userData)
-      
-      return { success: true, user: userData }
+      return { success: true };
     } catch (error) {
-      console.error('❌ AuthContext: Login error:', error)
-      
       return { 
         success: false, 
-        message: error.message || error.data?.message || 'Login failed' 
-      }
+        error: error.response?.data?.message || 'Login failed' 
+      };
     }
-  }
+  };
 
-  /**
-   * Google OAuth login
-   */
-  const googleLogin = async (googleData) => {
-    try {
-      console.log('🔄 AuthContext: Attempting Google login...')
-      const response = await authAPI.googleLogin(googleData)
-      console.log('✅ AuthContext: Google login response:', response)
-      
-      const { token: newToken, user: userData } = response
-      
-      localStorage.setItem('openSkillToken', newToken)
-      setToken(newToken)
-      setUser(userData)
-      
-      return { success: true, user: userData }
-    } catch (error) {
-      console.error('❌ AuthContext: Google login error:', error)
-      
-      return { 
-        success: false, 
-        message: error.message || error.data?.message || 'Google login failed' 
-      }
+  const logout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
     }
-  }
-
-  /**
-   * Logout user and clear token
-   */
-  const logout = async () => {
-    try {
-      if (token) {
-        await authAPI.logout(token)
-      }
-    } catch (error) {
-      console.error('Logout error:', error)
-    } finally {
-      localStorage.removeItem('openSkillToken')
-      setToken(null)
-      setUser(null)
-    }
-  }
+    setUser(null);
+  };
 
   const value = {
     user,
-    token,
-    loading,
     login,
-    googleLogin,
     logout,
-    isAuthenticated: !!user
-  }
+    loading
+  };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
-  )
-}
-
-/**
- * Custom hook to use auth context
- */
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
-}
+  );
+};
