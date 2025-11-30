@@ -1,189 +1,94 @@
 cat > /workspaces/open-skill-nepal/frontend/utils/api.js << 'EOF'
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://open-skill-nepal-669869115660.asia-south1.run.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+/**
+ * Generic API request handler
+ */
+const apiRequest = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(url, config);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
+};
 
 // Auth API endpoints
 export const authAPI = {
-  login: async (credentials) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Login failed: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Auth API Error:', error);
-      throw error;
-    }
-  },
+  login: (credentials) => 
+    apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    }),
   
-  register: async (userData) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Registration failed: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Auth API Error:', error);
-      throw error;
-    }
-  },
-  
-  logout: async () => {
-    // Clear local storage and state
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    return Promise.resolve({ success: true });
-  }
+  register: (userData) => 
+    apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    })
 };
 
 // Student API endpoints
 export const studentAPI = {
-  getAll: async (token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/students`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch students: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Student API Error:', error);
-      throw error;
-    }
-  },
+  getAll: () => apiRequest('/api/students'),
   
-  getById: async (id, token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/students/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch student: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Student API Error:', error);
-      throw error;
-    }
-  },
+  getById: (id) => apiRequest(`/api/students/${id}`),
   
-  create: async (studentData, token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/students`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(studentData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create student: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Student API Error:', error);
-      throw error;
-    }
-  }
+  create: (studentData) => 
+    apiRequest('/api/students', {
+      method: 'POST',
+      body: JSON.stringify(studentData),
+    })
 };
 
 // Video API endpoints
 export const videoAPI = {
-  getAll: async (token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/videos`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch videos: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Video API Error:', error);
-      throw error;
-    }
-  }
+  getAll: () => apiRequest('/api/videos')
 };
 
 // Dashboard API endpoints
 export const dashboardAPI = {
-  getStats: async (token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Dashboard API Error:', error);
-      throw error;
-    }
-  }
+  getStats: () => apiRequest('/api/dashboard/stats')
 };
 
 // School API endpoints
 export const schoolAPI = {
-  getAll: async (token) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/schools`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch schools: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('School API Error:', error);
-      throw error;
-    }
+  getAll: () => apiRequest('/api/schools')
+};
+
+/**
+ * Professional API Health Check
+ */
+export const checkApiHealth = async () => {
+  try {
+    const health = await apiRequest('/api/health');
+    return {
+      status: 'healthy',
+      database: health.database,
+      timestamp: health.timestamp
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
   }
 };
 EOF
