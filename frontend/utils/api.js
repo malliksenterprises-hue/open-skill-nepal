@@ -1,9 +1,8 @@
 cat > /workspaces/open-skill-nepal/frontend/utils/api.js << 'EOF'
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// API Configuration - Simple and reliable
+const API_BASE_URL = 'http://localhost:8080';
 
-/**
- * Generic API request handler
- */
+// Enhanced API request function with professional error handling
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -15,16 +14,21 @@ const apiRequest = async (endpoint, options = {}) => {
     ...options,
   };
 
+  if (options.body) {
+    config.body = JSON.stringify(options.body);
+  }
+
   try {
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
     }
     
     return await response.json();
   } catch (error) {
-    console.error('API request failed:', error);
+    console.error(`API Request Failed [${endpoint}]:`, error);
     throw error;
   }
 };
@@ -34,13 +38,13 @@ export const authAPI = {
   login: (credentials) => 
     apiRequest('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(credentials),
+      body: credentials,
     }),
   
   register: (userData) => 
     apiRequest('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: userData,
     })
 };
 
@@ -53,7 +57,7 @@ export const studentAPI = {
   create: (studentData) => 
     apiRequest('/api/students', {
       method: 'POST',
-      body: JSON.stringify(studentData),
+      body: studentData,
     })
 };
 
@@ -72,9 +76,7 @@ export const schoolAPI = {
   getAll: () => apiRequest('/api/schools')
 };
 
-/**
- * Professional API Health Check
- */
+// Health check endpoint
 export const checkApiHealth = async () => {
   try {
     const health = await apiRequest('/api/health');
