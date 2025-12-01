@@ -1,9 +1,11 @@
+# Create a clean AuthContext.js
 cat > /workspaces/open-skill-nepal/frontend/contexts/AuthContext.js << 'EOF'
 'use client';
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../utils/api';
 
+// Create Auth Context
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -17,16 +19,20 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(null);
 
   useEffect(() => {
-    // Check if user is logged in on initial load
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+    // Check for existing auth token on mount
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
     
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+    if (token && userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
     }
     
     setLoading(false);
@@ -37,20 +43,19 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const response = await authAPI.login({ email, password });
       
-      if (response.success && response.data) {
-        const { token: newToken, user: userData } = response.data;
-        
-        // Store in state
-        setToken(newToken);
-        setUser(userData);
+      if (response.success) {
+        const { token, user: userData } = response.data;
         
         // Store in localStorage
-        localStorage.setItem('token', newToken);
+        localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Update state
+        setUser(userData);
         
         return { success: true, user: userData };
       } else {
-        return { success: false, error: response.message || 'Login failed' };
+        return { success: false, error: response.message };
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -65,20 +70,19 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const response = await authAPI.register(userData);
       
-      if (response.success && response.data) {
-        const { token: newToken, user: newUser } = response.data;
-        
-        // Store in state
-        setToken(newToken);
-        setUser(newUser);
+      if (response.success) {
+        const { token, user: newUser } = response.data;
         
         // Store in localStorage
-        localStorage.setItem('token', newToken);
+        localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(newUser));
+        
+        // Update state
+        setUser(newUser);
         
         return { success: true, user: newUser };
       } else {
-        return { success: false, error: response.message || 'Registration failed' };
+        return { success: false, error: response.message };
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -88,28 +92,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      await authAPI.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear state regardless of API call success
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
   };
 
   const value = {
     user,
-    token,
     loading,
     login,
     register,
     logout,
-    isAuthenticated: !!user && !!token,
+    isAuthenticated: !!user,
   };
 
   return (
