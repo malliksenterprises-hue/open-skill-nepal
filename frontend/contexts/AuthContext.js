@@ -1,5 +1,3 @@
-# Create a clean AuthContext.js
-cat > /workspaces/open-skill-nepal/frontend/contexts/AuthContext.js << 'EOF'
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -115,4 +113,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export default AuthContext;
-EOF
