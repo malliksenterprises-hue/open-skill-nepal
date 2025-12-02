@@ -16,7 +16,7 @@ export default function StudentDashboard() {
 
   const fetchStudentData = async () => {
     try {
-      const token = localStorage.getItem('openSkillToken');
+      const token = localStorage.getItem('token');
       console.log('🔄 Fetching student data with token:', !!token);
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/student`, {
