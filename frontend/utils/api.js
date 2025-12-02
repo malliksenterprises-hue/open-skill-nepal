@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  'https://open-skill-nepal-669869115660.asia-south1.run.app';
 
 // Helper function for API calls
 const apiRequest = async (endpoint, options = {}) => {
@@ -53,25 +54,52 @@ export const studentAPI = {
   getById: (id) => apiRequest(`/api/students/${id}`),
   
   create: (studentData) => 
-    apiRequest('/api/students', {
+    apiRequest('/api/students/signup', {
       method: 'POST',
       body: studentData,
+    }),
+  
+  getPending: () => apiRequest('/api/students/pending'),
+  
+  getBySchool: (schoolId) => apiRequest(`/api/students/school/${schoolId}`),
+  
+  verify: (studentId) => 
+    apiRequest(`/api/students/${studentId}/verify`, {
+      method: 'PATCH',
     })
 };
 
 // Video API endpoints
 export const videoAPI = {
-  getAll: () => apiRequest('/api/videos')
+  getAll: () => apiRequest('/api/videos'),
+  
+  create: (videoData) => 
+    apiRequest('/api/videos', {
+      method: 'POST',
+      body: videoData,
+    })
 };
 
 // Dashboard API endpoints
 export const dashboardAPI = {
-  getStats: () => apiRequest('/api/dashboard/stats')
+  getAdminStats: () => apiRequest('/api/dashboard/admin'),
+  
+  getTeacherStats: () => apiRequest('/api/dashboard/teacher'),
+  
+  getStudentStats: () => apiRequest('/api/dashboard/student')
 };
 
 // School API endpoints
 export const schoolAPI = {
-  getAll: () => apiRequest('/api/schools')
+  getAll: () => apiRequest('/api/schools'),
+  
+  create: (schoolData) => 
+    apiRequest('/api/schools', {
+      method: 'POST',
+      body: schoolData,
+    }),
+  
+  getById: (id) => apiRequest(`/api/schools/${id}`)
 };
 
 // Health check endpoint
@@ -91,3 +119,6 @@ export const checkApiHealth = async () => {
     };
   }
 };
+
+// Export API_BASE_URL if needed elsewhere
+export { API_BASE_URL };
