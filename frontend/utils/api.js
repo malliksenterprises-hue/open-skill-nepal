@@ -1,8 +1,6 @@
-cat > /workspaces/open-skill-nepal/frontend/utils/api.js << 'EOF'
-// API Configuration - Simple and reliable
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-// Enhanced API request function with professional error handling
+// Helper function for API calls
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -93,4 +91,3 @@ export const checkApiHealth = async () => {
     };
   }
 };
-EOF
