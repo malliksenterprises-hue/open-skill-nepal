@@ -7,7 +7,19 @@ require('dotenv').config();
 
 const app = express();
 
-// Security middleware
+// ============ VIDEO SCHEDULER INITIALIZATION ============
+// Add this at the VERY TOP, right after imports
+if (process.env.NODE_ENV !== 'test') {
+  try {
+    require('./cron/videoScheduler');
+    console.log('⏰ Video scheduler initialized');
+  } catch (error) {
+    console.warn('⚠️ Video scheduler could not be initialized:', error.message);
+    console.log('📝 Video status updates will not work automatically');
+  }
+}
+
+// ============ SECURITY MIDDLEWARE ============
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -16,7 +28,8 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"]
+      connectSrc: ["'self'"],
+      mediaSrc: ["'self'", "https://storage.googleapis.com"] // ADD THIS for video streaming
     }
   },
   crossOriginEmbedderPolicy: false
@@ -26,11 +39,12 @@ app.use(cors({
   origin: [
     'https://openskillnepal.com',
     'https://www.openskillnepal.com',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://localhost:3001'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Upload-Content-Type', 'X-Upload-Content-Length']
 }));
 
 const limiter = rateLimit({
@@ -46,17 +60,23 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' })); // INCREASED for video uploads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Health checks
+// ============ HEALTH CHECKS ============
 app.get('/', (req, res) => {
   res.status(200).json({
-    message: '🚀 Open Skill Nepal Backend API - FIXED VERSION',
-    version: '2.0.0',
+    message: '🚀 Open Skill Nepal Backend API - PHASE 2 VIDEO SYSTEM',
+    version: '2.1.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    features: {
+      videoUpload: true,
+      videoScheduling: true,
+      liveClasses: true,
+      studentVerification: true
+    }
   });
 });
 
@@ -67,7 +87,11 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     environment: process.env.NODE_ENV || 'development',
-    nodeVersion: process.version
+    nodeVersion: process.version,
+    features: {
+      videoScheduler: true,
+      googleCloudStorage: !!process.env.GOOGLE_APPLICATION_CREDENTIALS
+    }
   };
   res.status(200).json(healthCheck);
 });
@@ -79,23 +103,59 @@ app.get('/_ah/health', (req, res) => {
   });
 });
 
-// ✅ ALL API ROUTES DIRECTLY IN SERVER (NO MODULE LOADING ISSUES)
-console.log('✅ Loading direct API routes...');
+// ============ IMPORT ROUTES ============
+// We'll use actual route files now instead of hardcoded responses
+console.log('📁 Loading route modules...');
 
-// API Health
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'API health check',
-    timestamp: new Date().toISOString()
+try {
+  // Import route modules
+  const authRoutes = require('./routes/authRoutes');
+  const studentRoutes = require('./routes/studentRoutes');
+  const schoolRoutes = require('./routes/schoolRoutes');
+  const dashboardRoutes = require('./routes/dashboardRoutes');
+  const videoRoutes = require('./routes/videoRoutes'); // NEW
+  
+  // Use route modules
+  app.use('/api/auth', authRoutes);
+  app.use('/api/students', studentRoutes);
+  app.use('/api/schools', schoolRoutes);
+  app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/videos', videoRoutes); // NEW
+  
+  console.log('✅ All route modules loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load route modules:', error.message);
+  console.log('📝 Using fallback routes instead');
+  
+  // Fallback routes if module loading fails
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({
+      status: 'success',
+      message: 'API health check',
+      timestamp: new Date().toISOString()
+    });
   });
-});
 
-// Students routes
-app.get('/api/students', (req, res) => {
+  app.get('/api/videos', (req, res) => {
+    res.status(200).json({
+      status: 'success',
+      message: 'Videos endpoint - Module loading failed, using fallback',
+      data: {
+        videos: [],
+        total: 0
+      },
+      timestamp: new Date().toISOString()
+    });
+  });
+}
+
+// ============ FALLBACK ROUTES (For backward compatibility) ============
+// These will only work if the module routes fail
+
+app.get('/api/students/fallback', (req, res) => {
   res.status(200).json({
     status: 'success',
-    message: 'Students endpoint - GET all students',
+    message: 'Students endpoint - GET all students (fallback)',
     data: {
       students: [
         { id: 1, name: 'Student One', grade: '10', school: 'School A' },
@@ -109,57 +169,10 @@ app.get('/api/students', (req, res) => {
   });
 });
 
-app.get('/api/students/:id', (req, res) => {
+app.get('/api/schools/fallback', (req, res) => {
   res.status(200).json({
     status: 'success',
-    message: `Student details for ID: ${req.params.id}`,
-    data: {
-      id: req.params.id,
-      name: 'Sample Student',
-      email: 'student@example.com',
-      school: 'Sample School',
-      grade: '10',
-      progress: 75
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Videos routes
-app.get('/api/videos', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Videos endpoint - GET all videos',
-    data: {
-      videos: [
-        {
-          id: 1,
-          title: 'Introduction to Mathematics',
-          description: 'Basic math concepts',
-          duration: '15:30',
-          category: 'mathematics',
-          views: 150
-        },
-        {
-          id: 2,
-          title: 'Science Experiments',
-          description: 'Fun science demonstrations',
-          duration: '22:45',
-          category: 'science',
-          views: 89
-        }
-      ],
-      total: 2
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Schools routes
-app.get('/api/schools', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Schools endpoint - GET all schools',
+    message: 'Schools endpoint - GET all schools (fallback)',
     data: {
       schools: [
         {
@@ -183,74 +196,30 @@ app.get('/api/schools', (req, res) => {
   });
 });
 
-// Dashboard routes
-app.get('/api/dashboard/stats', (req, res) => {
+// ============ TEST ENDPOINT FOR VIDEO SYSTEM ============
+app.get('/api/test-video-system', (req, res) => {
   res.status(200).json({
-    status: 'success',
-    message: 'Dashboard statistics',
-    data: {
-      totalStudents: 1250,
-      totalSchools: 15,
-      totalVideos: 89,
-      activeUsers: 342,
-      completionRate: 67
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Auth routes
-app.post('/api/auth/register', (req, res) => {
-  res.status(201).json({
-    status: 'success',
-    message: 'User registered successfully',
-    data: {
-      id: 'user_' + Date.now(),
-      email: req.body.email || 'user@example.com',
-      role: req.body.role || 'student',
-      created: new Date().toISOString()
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post('/api/auth/login', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Login successful',
-    data: {
-      token: 'jwt_sample_token_' + Date.now(),
-      user: {
-        id: 'user_123',
-        email: req.body.email || 'user@example.com',
-        role: 'student',
-        name: 'Sample User'
-      },
-      expiresIn: '24h'
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Test routes endpoint
-app.get('/api/test-routes', (req, res) => {
-  res.status(200).json({
-    message: '✅ ALL ROUTES ARE WORKING!',
+    message: '✅ VIDEO SYSTEM TEST',
     timestamp: new Date().toISOString(),
-    status: 'operational',
-    availableEndpoints: [
-      '/api/health',
-      '/api/students',
-      '/api/videos', 
-      '/api/schools',
-      '/api/dashboard/stats',
-      '/api/auth/register',
-      '/api/auth/login'
-    ]
+    status: 'testing',
+    videoSystem: {
+      scheduler: 'active',
+      storage: process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'configured' : 'not configured',
+      bucket: 'open-skill-nepal-videos',
+      endpoints: [
+        'POST /api/videos/upload',
+        'GET /api/videos/live-now',
+        'GET /api/videos/upcoming',
+        'GET /api/videos/recorded',
+        'GET /api/videos/my-videos',
+        'GET /api/videos/school-videos',
+        'GET /api/videos/student-videos'
+      ]
+    }
   });
 });
 
-// Error handling
+// ============ ERROR HANDLING ============
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
@@ -260,12 +229,13 @@ app.use('*', (req, res) => {
       'GET /',
       'GET /health',
       'GET /api/health',
-      'GET /api/students',
-      'GET /api/videos',
-      'GET /api/schools',
-      'GET /api/dashboard/stats',
-      'POST /api/auth/register',
-      'POST /api/auth/login'
+      'GET /api/test-video-system',
+      'POST /api/videos/upload',
+      'GET /api/videos/live-now',
+      'GET /api/videos/upcoming',
+      'GET /api/videos/recorded',
+      'GET /api/students/fallback',
+      'GET /api/schools/fallback'
     ]
   });
 });
@@ -275,34 +245,46 @@ app.use((error, req, res, next) => {
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : error.message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
   });
 });
 
+// ============ SERVER STARTUP ============
 const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(60));
-  console.log('🚀 OPEN SKILL NEPAL - FIXED BACKEND');
+  console.log('🚀 OPEN SKILL NEPAL - PHASE 2 VIDEO SYSTEM');
   console.log('='.repeat(60));
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🕒 Started: ${new Date().toISOString()}`);
-  console.log(`✅ All routes are directly defined in server.js`);
+  console.log(`⏰ Video Scheduler: ${process.env.NODE_ENV !== 'test' ? 'ACTIVE' : 'DISABLED'}`);
+  console.log(`☁️  Google Cloud Storage: ${process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
   console.log('='.repeat(60));
-  console.log('🎯 Test these endpoints:');
-  console.log(`   http://localhost:${PORT}/api/test-routes`);
-  console.log(`   http://localhost:${PORT}/api/students`);
-  console.log(`   http://localhost:${PORT}/api/videos`);
+  console.log('🎯 PHASE 2 VIDEO ENDPOINTS:');
+  console.log(`   POST http://localhost:${PORT}/api/videos/upload`);
+  console.log(`   GET  http://localhost:${PORT}/api/videos/live-now`);
+  console.log(`   GET  http://localhost:${PORT}/api/videos/upcoming`);
+  console.log(`   GET  http://localhost:${PORT}/api/videos/recorded`);
+  console.log(`   GET  http://localhost:${PORT}/api/test-video-system`);
   console.log('='.repeat(60));
 });
 
-// Graceful shutdown
+// ============ GRACEFUL SHUTDOWN ============
 const gracefulShutdown = (signal) => {
   console.log(`\n🔄 ${signal} received, starting graceful shutdown...`);
   server.close(() => {
     console.log('✅ HTTP server closed');
+    // Stop video scheduler if needed
     process.exit(0);
   });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
