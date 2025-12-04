@@ -1,14 +1,36 @@
 const mongoose = require('mongoose');
 
+const viewerSchema = new mongoose.Schema({
+  student: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  durationWatched: {
+    type: Number,
+    default: 0
+  },
+  completed: {
+    type: Boolean,
+    default: false
+  },
+  watchedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const videoSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'Title is required'],
+    trim: true,
+    maxlength: [200, 'Title cannot exceed 200 characters']
   },
   description: {
     type: String,
-    default: ''
+    trim: true,
+    maxlength: [1000, 'Description cannot exceed 1000 characters']
   },
   filename: {
     type: String,
@@ -18,109 +40,106 @@ const videoSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  thumbnailUrl: {
-    type: String,
-    default: ''
-  },
-  duration: {
-    type: Number, // in seconds
-    default: 0
-  },
   fileSize: {
-    type: Number, // in bytes
-    default: 0
+    type: Number,
+    required: true
+  },
+  mimeType: {
+    type: String,
+    required: true
   },
   teacher: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  subjects: [{
-    type: String,
-    enum: ['mathematics', 'science', 'english', 'nepali', 'social', 'computer', 'other']
-  }],
-  gradeLevel: {
-    type: String,
-    enum: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'all'],
-    default: 'all'
-  },
   scheduledFor: {
     type: Date,
     required: true
-  },
-  status: {
-    type: String,
-    enum: ['scheduled', 'live', 'completed'],
-    default: 'scheduled'
   },
   assignedSchools: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'School',
     required: true
   }],
-  viewers: [{
-    student: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    watchedAt: {
-      type: Date,
-      default: Date.now
-    },
-    durationWatched: {
-      type: Number, // in seconds
-      default: 0
-    },
-    completed: {
-      type: Boolean,
-      default: false
-    }
+  subjects: [{
+    type: String,
+    trim: true
   }],
-  isPublic: {
-    type: Boolean,
-    default: false
+  gradeLevel: {
+    type: String,
+    default: 'all',
+    enum: ['9', '10', '11', '12', 'college', 'all']
+  },
+  status: {
+    type: String,
+    enum: ['scheduled', 'live', 'recorded', 'completed', 'published', 'draft'],
+    default: 'scheduled'
+  },
+  // New Phase 2 fields
+  duration: {
+    type: Number, // in seconds
+    default: 0
+  },
+  thumbnailUrl: {
+    type: String,
+    default: ''
+  },
+  videoType: {
+    type: String,
+    enum: ['lecture', 'tutorial', 'demo', 'review', 'qna'],
+    default: 'lecture'
+  },
+  views: {
+    type: Number,
+    default: 0
+  },
+  viewers: [viewerSchema],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Index for better query performance
-videoSchema.index({ teacher: 1 });
-videoSchema.index({ assignedSchools: 1 });
-videoSchema.index({ status: 1 });
-videoSchema.index({ scheduledFor: 1 });
-videoSchema.index({ assignedSchools: 1, status: 1 });
-videoSchema.index({ teacher: 1, scheduledFor: -1 });
+// Update timestamp on save
+videoSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
-// Static method to get live classes for a school
-videoSchema.statics.getLiveClassesForSchool = function(schoolId) {
+// Static methods
+videoSchema.statics.getLiveClassesForSchool = async function(schoolId) {
   const currentTime = new Date();
-  const twoHoursAgo = new Date(currentTime.getTime() - 2 * 60 * 60 * 1000);
-  
   return this.find({
     assignedSchools: schoolId,
     status: 'live',
-    scheduledFor: { $gte: twoHoursAgo }
-  }).populate('teacher', 'name avatar');
+    scheduledFor: { $lte: currentTime }
+  })
+  .populate('teacher', 'name avatar')
+  .sort({ scheduledFor: -1 });
 };
 
-// Static method to get upcoming classes for a school
-videoSchema.statics.getUpcomingClassesForSchool = function(schoolId) {
+videoSchema.statics.getUpcomingClassesForSchool = async function(schoolId) {
   const currentTime = new Date();
-  
   return this.find({
     assignedSchools: schoolId,
     status: 'scheduled',
     scheduledFor: { $gt: currentTime }
-  }).populate('teacher', 'name avatar')
-    .sort({ scheduledFor: 1 })
-    .limit(10);
+  })
+  .populate('teacher', 'name avatar')
+  .sort({ scheduledFor: 1 });
 };
 
-// Instance method to check if student can access
-videoSchema.methods.canStudentAccess = function(studentSchool) {
-  return this.assignedSchools.includes(studentSchool) && 
-         (this.status === 'live' || this.status === 'completed');
-};
+// Indexes for performance
+videoSchema.index({ teacher: 1, createdAt: -1 });
+videoSchema.index({ assignedSchools: 1, status: 1, scheduledFor: -1 });
+videoSchema.index({ status: 1, scheduledFor: 1 });
+videoSchema.index({ scheduledFor: 1 });
 
-module.exports = mongoose.model('Video', videoSchema);
+const Video = mongoose.model('Video', videoSchema);
+
+module.exports = Video;
