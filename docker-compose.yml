@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Main Backend Service
+  backend:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-development}  # Use 'production' for prod builds
+    container_name: open-skill-nepal-backend
+    ports:
+      - "${PORT:-8080}:8080"
+      - "9229:9229"  # Node.js debug port
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=8080
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/open-skill-nepal}
+      - JWT_SECRET=${JWT_SECRET:-your_super_secret_jwt_key_change_this}
+      - GCP_SERVICE_ACCOUNT_KEY_BASE64=${GCP_SERVICE_ACCOUNT_KEY_BASE64}
+      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME:-open-skill-nepal-videos}
+      - GCS_PROJECT_ID=${GCS_PROJECT_ID:-open-skill-nepal-478611}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+      - ./logs:/usr/src/app/logs
+      - ./src:/usr/src/app/src  # Hot reload for development
+      - /usr/src/app/node_modules  # Prevent overwriting container node_modules
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', (r) => {if(r.statusCode!==200)process.exit(1)}).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+    # Development specific
+    stdin_open: true
+    tty: true
+    command: ${COMMAND:-npm run dev}
+
+  # MongoDB Service
+  mongodb:
+    image: mongo:6
+    container_name: open-skill-nepal-mongodb
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=open-skill-nepal
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: ["--auth", "--bind_ip_all"]
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: open-skill-nepal-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Optional: Adminer for database management
+  adminer:
+    image: adminer
+    container_name: open-skill-nepal-adminer
+    ports:
+      - "8081:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=mongodb
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
