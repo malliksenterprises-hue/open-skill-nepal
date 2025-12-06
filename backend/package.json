@@ -1,6 +1,8 @@
 {
   "name": "open-skill-nepal-backend",
-  "version": "3.0.0",  // Updated version for Phase 3
+  "version": "3.0.0",  
+  
+  // Updated version for Phase 3
   "description": "Open Skill Nepal Backend - Professional Grade API with Live Classes",
   "main": "server.js",
   "scripts": {
@@ -12,7 +14,9 @@
     "lint:fix": "eslint . --fix",
     "security-audit": "npm audit --audit-level=moderate",
     "deploy:production": "gcloud run deploy open-skill-nepal --source . --region asia-south1",
-    "seed": "node scripts/seed.js",  // Added for database seeding
+    "seed": "node scripts/seed.js",  
+    
+    // Added for database seeding
     "seed:test": "NODE_ENV=test node scripts/seed.js"
   },
   "dependencies": {
