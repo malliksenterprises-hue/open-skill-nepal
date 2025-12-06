@@ -1,8 +1,6 @@
 {
   "name": "open-skill-nepal-backend",
-  "version": "3.0.0",  
-  
-  // Updated version for Phase 3
+  "version": "3.0.0",
   "description": "Open Skill Nepal Backend - Professional Grade API with Live Classes",
   "main": "server.js",
   "scripts": {
@@ -14,13 +12,10 @@
     "lint:fix": "eslint . --fix",
     "security-audit": "npm audit --audit-level=moderate",
     "deploy:production": "gcloud run deploy open-skill-nepal --source . --region asia-south1",
-    "seed": "node scripts/seed.js",  
-    
-    // Added for database seeding
+    "seed": "node scripts/seed.js",
     "seed:test": "NODE_ENV=test node scripts/seed.js"
   },
   "dependencies": {
-    // ============ CORE DEPENDENCIES ============
     "express": "^4.18.2",
     "mongoose": "^7.5.0",
     "bcryptjs": "^2.4.3",
@@ -32,8 +27,6 @@
     "express-rate-limit": "^7.1.5",
     "winston": "^3.11.0",
     "express-validator": "^7.0.1",
-    
-    // ============ PHASE 2: VIDEO SYSTEM ============
     "multer": "^1.4.5-lts.1",
     "@google-cloud/storage": "^6.9.5",
     "fluent-ffmpeg": "^2.1.2",
@@ -42,22 +35,18 @@
     "axios": "^1.6.0",
     "moment": "^2.29.4",
     "joi": "^17.11.0",
-    
-    // ============ PHASE 3: LIVE CLASSES ============
     "socket.io": "^4.7.2",
     "mediasoup": "^3.11.12",
     "mediasoup-client": "^3.6.63",
     "uuid": "^9.0.1",
-    
-    // ============ OPTIONAL / MONITORING ============
-    "prom-client": "^14.2.0"  // For metrics (optional)
+    "prom-client": "^14.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",
     "jest": "^29.6.2",
     "eslint": "^8.57.0",
     "supertest": "^6.3.3",
-    "mongodb-memory-server": "^9.1.1"  // For testing
+    "mongodb-memory-server": "^9.1.1"
   },
   "engines": {
     "node": ">=18.0.0",
