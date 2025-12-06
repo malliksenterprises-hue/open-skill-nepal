@@ -1,49 +1,29 @@
 const express = require('express');
 const router = express.Router();
 
-// Import individual route files
+// Import all route files
 const authRoutes = require('./authRoutes');
 const studentRoutes = require('./studentRoutes');
-const videoRoutes = require('./videoRoutes');
 const schoolRoutes = require('./schoolRoutes');
+const videoRoutes = require('./videoRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
+const liveSessionRoutes = require('./liveSessionRoutes'); // NEW
 
-// Mount all routes
+// Use routes
 router.use('/auth', authRoutes);
 router.use('/students', studentRoutes);
-router.use('/videos', videoRoutes);
 router.use('/schools', schoolRoutes);
+router.use('/videos', videoRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/live-sessions', liveSessionRoutes); // NEW
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Open Skill Nepal API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-// Debug endpoint for phase 2
-router.get('/debug/phase2', (req, res) => {
-  res.status(200).json({
-    phase: 2,
-    status: 'in-progress',
-    message: 'Backend API development in progress',
-    completed: ['infrastructure', 'security', 'basic-routes'],
-    pending: ['database', 'authentication', 'file-upload'],
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Handle 404 for undefined API routes
-router.all('*', (req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: `API route ${req.originalUrl} not found`,
-    timestamp: new Date().toISOString()
-  });
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'open-skill-nepal-api'
+    });
 });
 
 module.exports = router;
