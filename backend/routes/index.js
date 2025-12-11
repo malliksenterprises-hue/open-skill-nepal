@@ -1,29 +1,28 @@
 const express = require('express');
 const router = express.Router();
 
-// Import all route files
+// Import route files
 const authRoutes = require('./authRoutes');
-const studentRoutes = require('./studentRoutes');
-const schoolRoutes = require('./schoolRoutes');
-const videoRoutes = require('./videoRoutes');
-const dashboardRoutes = require('./dashboardRoutes');
-const liveSessionRoutes = require('./liveSessionRoutes'); // NEW
+const userRoutes = require('./userRoutes');
+const classRoutes = require('./classRoutes');
+const liveSessionRoutes = require('./liveSessionRoutes');
+const deviceRoutes = require('./deviceRoutes'); // Add this line
 
 // Use routes
 router.use('/auth', authRoutes);
-router.use('/students', studentRoutes);
-router.use('/schools', schoolRoutes);
-router.use('/videos', videoRoutes);
-router.use('/dashboard', dashboardRoutes);
-router.use('/live-sessions', liveSessionRoutes); // NEW
+router.use('/users', userRoutes);
+router.use('/classes', classRoutes);
+router.use('/live-sessions', liveSessionRoutes);
+router.use('/devices', deviceRoutes); // Add this line
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'open-skill-nepal-api'
-    });
+  res.status(200).json({
+    status: 'healthy',
+    message: 'Phase 3 - Live Classes Implemented with Device Limits',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
 });
 
 module.exports = router;
