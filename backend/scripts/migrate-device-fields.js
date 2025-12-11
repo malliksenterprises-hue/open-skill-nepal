@@ -23,15 +23,14 @@ const migrateDeviceFields = async () => {
     const deviceUpdateResult = await Device.updateMany(
       {},
       {
-        $setOnInsert: {
-          sessionCount: 0,
-          lastSessionType: null,
-          lastSessionAt: null,
-          removedReason: null,
-          removedAt: null
+        $set: {
+          sessionCount: { $ifNull: ['$sessionCount', 0] },
+          lastSessionType: { $ifNull: ['$lastSessionType', null] },
+          lastSessionAt: { $ifNull: ['$lastSessionAt', null] },
+          removedReason: { $ifNull: ['$removedReason', null] },
+          removedAt: { $ifNull: ['$removedAt', null] }
         }
-      },
-      { upsert: false }
+      }
     );
 
     console.log(`Updated ${deviceUpdateResult.modifiedCount} devices`);
@@ -64,11 +63,11 @@ const migrateDeviceFields = async () => {
     await Device.collection.createIndex({ schoolId: 1, lastSessionAt: -1 });
     await Device.collection.createIndex({ deviceFingerprint: 1, isActive: 1 });
 
-    console.log('Migration completed successfully!');
+    console.log('✅ Migration completed successfully!');
     
     process.exit(0);
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error('❌ Migration failed:', error);
     process.exit(1);
   }
 };
