@@ -14,13 +14,21 @@ class ClassLoginController {
   
   /**
    * Create a new Class Login
-   * Only School Admin can create
+   * ONLY School Admin can create (Phase 3 fix)
    */
   static async createClassLogin(req, res) {
     try {
       const { schoolId, classId, loginId, password, maxDevices, expiresAt } = req.body;
       const userId = req.user.id;
       const userRole = req.user.role;
+      
+      // PHASE 3 FIX: Only School Admin can create Class Logins
+      if (userRole !== 'schoolAdmin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only School Admin can create Class Logins'
+        });
+      }
       
       // Validate required fields
       const errors = validateRequest(req.body, [
@@ -34,13 +42,10 @@ class ClassLoginController {
         });
       }
       
-      // Check if user has permission to create for this school
+      // PHASE 3 FIX: School Admin can only create for their own school
       const school = await School.findOne({
         _id: schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
+        adminId: userId  // Only check adminId, not managers
       });
       
       if (!school) {
@@ -270,7 +275,7 @@ class ClassLoginController {
   
   /**
    * Get Class Logins for a school
-   * School Admin and Managers can access
+   * Only School Admin can view their own school's logins (Phase 3 fix)
    */
   static async getBySchool(req, res) {
     try {
@@ -278,15 +283,12 @@ class ClassLoginController {
       const userId = req.user.id;
       const userRole = req.user.role;
       
-      // Super Admin can access any school
-      if (userRole !== 'superAdmin') {
-        // Check if user has permission to view this school
+      // PHASE 3 FIX: Restrict access based on role
+      if (userRole === 'schoolAdmin') {
+        // School Admin can only access their own school
         const school = await School.findOne({
           _id: schoolId,
-          $or: [
-            { adminId: userId },
-            { 'managers.userId': userId }
-          ]
+          adminId: userId  // Only adminId, not managers
         });
         
         if (!school) {
@@ -295,6 +297,15 @@ class ClassLoginController {
             message: 'Unauthorized to view Class Logins for this school'
           });
         }
+      } else if (userRole === 'superAdmin' || userRole === 'admin') {
+        // Super Admin and Admin can access any school
+        // No additional check needed
+      } else {
+        // Teachers, Students, ClassLogin cannot view Class Logins
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions'
+        });
       }
       
       // Get Class Logins with pagination
@@ -350,13 +361,22 @@ class ClassLoginController {
   
   /**
    * Update Class Login
-   * Only School Admin can update
+   * ONLY School Admin can update (Phase 3 fix)
    */
   static async update(req, res) {
     try {
       const { id } = req.params;
       const updates = req.body;
       const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // PHASE 3 FIX: Only School Admin can update Class Logins
+      if (userRole !== 'schoolAdmin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only School Admin can update Class Logins'
+        });
+      }
       
       // Find Class Login
       const classLogin = await ClassLogin.findById(id);
@@ -368,13 +388,10 @@ class ClassLoginController {
         });
       }
       
-      // Check permission
+      // PHASE 3 FIX: School Admin can only update their own school's logins
       const school = await School.findOne({
         _id: classLogin.schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
+        adminId: userId  // Only adminId, not managers
       });
       
       if (!school) {
@@ -448,12 +465,21 @@ class ClassLoginController {
   
   /**
    * Delete (deactivate) Class Login
-   * Soft delete - sets isActive to false
+   * ONLY School Admin can delete (Phase 3 fix)
    */
   static async delete(req, res) {
     try {
       const { id } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // PHASE 3 FIX: Only School Admin can delete Class Logins
+      if (userRole !== 'schoolAdmin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only School Admin can delete Class Logins'
+        });
+      }
       
       // Find Class Login
       const classLogin = await ClassLogin.findById(id);
@@ -465,13 +491,10 @@ class ClassLoginController {
         });
       }
       
-      // Check permission
+      // PHASE 3 FIX: School Admin can only delete their own school's logins
       const school = await School.findOne({
         _id: classLogin.schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
+        adminId: userId  // Only adminId, not managers
       });
       
       if (!school) {
@@ -518,6 +541,7 @@ class ClassLoginController {
     try {
       const { id } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
       
       // Find Class Login
       const classLogin = await ClassLogin.findById(id);
@@ -529,19 +553,28 @@ class ClassLoginController {
         });
       }
       
-      // Check permission
-      const school = await School.findOne({
-        _id: classLogin.schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
-      });
-      
-      if (!school) {
+      // PHASE 3 FIX: Restrict device view access
+      if (userRole === 'schoolAdmin') {
+        // School Admin can only view their own school's devices
+        const school = await School.findOne({
+          _id: classLogin.schoolId,
+          adminId: userId
+        });
+        
+        if (!school) {
+          return res.status(403).json({
+            success: false,
+            message: 'Unauthorized to view devices for this Class Login'
+          });
+        }
+      } else if (userRole === 'superAdmin' || userRole === 'admin') {
+        // Super Admin and Admin can view any school's devices
+        // No additional check needed
+      } else {
+        // Teachers, Students, ClassLogin cannot view devices
         return res.status(403).json({
           success: false,
-          message: 'Unauthorized to view devices for this Class Login'
+          message: 'Insufficient permissions to view devices'
         });
       }
       
@@ -578,6 +611,15 @@ class ClassLoginController {
     try {
       const { id, deviceId } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // PHASE 3 FIX: Only School Admin, Admin, Super Admin can revoke devices
+      if (!['schoolAdmin', 'admin', 'superAdmin'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to revoke devices'
+        });
+      }
       
       // Find Class Login
       const classLogin = await ClassLogin.findById(id);
@@ -589,21 +631,22 @@ class ClassLoginController {
         });
       }
       
-      // Check permission
-      const school = await School.findOne({
-        _id: classLogin.schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
-      });
-      
-      if (!school) {
-        return res.status(403).json({
-          success: false,
-          message: 'Unauthorized to revoke devices for this Class Login'
+      // Check permission based on role
+      if (userRole === 'schoolAdmin') {
+        // School Admin can only revoke from their own school
+        const school = await School.findOne({
+          _id: classLogin.schoolId,
+          adminId: userId
         });
+        
+        if (!school) {
+          return res.status(403).json({
+            success: false,
+            message: 'Unauthorized to revoke devices for this Class Login'
+          });
+        }
       }
+      // Admin and Super Admin can revoke from any school (no additional check)
       
       // Find and deactivate device
       const device = await Device.findOneAndUpdate(
@@ -647,12 +690,21 @@ class ClassLoginController {
   
   /**
    * Reset all devices for a Class Login
-   * Useful when device limit is reached or suspicious activity
+   * ONLY School Admin, Admin, Super Admin can reset (Phase 3 fix)
    */
   static async resetDevices(req, res) {
     try {
       const { id } = req.params;
       const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // PHASE 3 FIX: Only School Admin, Admin, Super Admin can reset devices
+      if (!['schoolAdmin', 'admin', 'superAdmin'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to reset devices'
+        });
+      }
       
       // Find Class Login
       const classLogin = await ClassLogin.findById(id);
@@ -664,21 +716,22 @@ class ClassLoginController {
         });
       }
       
-      // Check permission
-      const school = await School.findOne({
-        _id: classLogin.schoolId,
-        $or: [
-          { adminId: userId },
-          { 'managers.userId': userId }
-        ]
-      });
-      
-      if (!school) {
-        return res.status(403).json({
-          success: false,
-          message: 'Unauthorized to reset devices for this Class Login'
+      // Check permission based on role
+      if (userRole === 'schoolAdmin') {
+        // School Admin can only reset their own school's devices
+        const school = await School.findOne({
+          _id: classLogin.schoolId,
+          adminId: userId
         });
+        
+        if (!school) {
+          return res.status(403).json({
+            success: false,
+            message: 'Unauthorized to reset devices for this Class Login'
+          });
+        }
       }
+      // Admin and Super Admin can reset any school's devices (no additional check)
       
       // Deactivate all devices
       await Device.updateMany(
