@@ -89,14 +89,23 @@ const authenticate = async (req, res, next) => {
         });
       }
       
-      // For teachers, check if they are verified
+      // For teachers, check if they are verified AND assigned to a school
       if (user.role === 'teacher') {
         const teacher = await Teacher.findOne({ userId: user._id });
         if (!teacher || !teacher.isVerified) {
           return res.status(403).json({
             success: false,
-            message: 'Teacher account is not verified',
+            message: 'Teacher account is not verified by administrator',
             code: 'TEACHER_NOT_VERIFIED'
+          });
+        }
+        
+        // NEW: Check if teacher is assigned to a school
+        if (!teacher.assignedSchoolId) {
+          return res.status(403).json({
+            success: false,
+            message: 'Teacher is not assigned to any school',
+            code: 'TEACHER_UNASSIGNED'
           });
         }
       }
@@ -276,13 +285,15 @@ const authorize = (allowedRoles) => {
       
       // Special validations based on role
       
-      // Block students from live class routes
+      // Block students from ANY live class access
       if (userRole === 'student') {
         const liveClassRoutes = [
           '/api/live-class',
           '/api/class-login',
           '/api/devices/validate',
-          '/api/teacher/'
+          '/api/teacher/live',
+          '/api/live-class/join',
+          '/api/live-class/stream'
         ];
         
         const isLiveClassRoute = liveClassRoutes.some(route => 
@@ -292,20 +303,20 @@ const authorize = (allowedRoles) => {
         if (isLiveClassRoute) {
           return res.status(403).json({
             success: false,
-            message: 'Students cannot access live classes',
+            message: 'Students can ONLY access recorded classes and notes',
             code: 'STUDENT_LIVE_CLASS_BLOCKED'
           });
         }
       }
       
-      // Class Login specific validations
+      // Class Login specific validations - ONLY access live classes
       if (userRole === 'classLogin') {
-        // Class Login can only access specific endpoints
+        // Class Login can ONLY access live class join/stream endpoints
         const allowedClassLoginRoutes = [
-          '/api/devices/validate',
           '/api/live-class/join',
           '/api/live-class/stream',
-          '/api/class-login/auth'
+          '/api/live-class/raise-hand',
+          '/api/live-class/chat'
         ];
         
         const isAllowedRoute = allowedClassLoginRoutes.some(route => 
@@ -315,7 +326,7 @@ const authorize = (allowedRoles) => {
         if (!isAllowedRoute) {
           return res.status(403).json({
             success: false,
-            message: 'Class Login can only access live class endpoints',
+            message: 'Class Login can ONLY access live class features',
             code: 'CLASS_LOGIN_RESTRICTED'
           });
         }
@@ -388,6 +399,7 @@ const hasPermission = (permission) => {
 
 /**
  * Verify teacher is assigned to the class they're trying to access
+ * AND verify they belong to the correct school
  */
 const verifyTeacherClassAccess = async (req, res, next) => {
   try {
@@ -396,15 +408,34 @@ const verifyTeacherClassAccess = async (req, res, next) => {
     }
     
     const classId = req.params.classId || req.body.classId;
+    const schoolId = req.params.schoolId || req.body.schoolId;
     
     if (!classId) {
       return next();
     }
     
-    // Check if teacher is assigned to this class
+    // Check if teacher is assigned to this class AND school
     const teacher = await Teacher.findOne({ userId: req.user.id });
     
-    if (!teacher || !teacher.assignedClasses.includes(classId)) {
+    if (!teacher) {
+      return res.status(403).json({
+        success: false,
+        message: 'Teacher profile not found',
+        code: 'TEACHER_NOT_FOUND'
+      });
+    }
+    
+    // Check school assignment
+    if (schoolId && teacher.assignedSchoolId.toString() !== schoolId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Teacher not assigned to this school',
+        code: 'TEACHER_WRONG_SCHOOL'
+      });
+    }
+    
+    // Check class assignment
+    if (!teacher.assignedClasses.includes(classId)) {
       return res.status(403).json({
         success: false,
         message: 'Teacher not assigned to this class',
